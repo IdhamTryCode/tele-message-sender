@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -18,6 +18,24 @@ export default function LoginPage() {
   const [code, setCode] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  // Guards against a native (non-JS) form submission if a user clicks
+  // before React has hydrated: without onSubmit attached yet, a <form>
+  // with no explicit method defaults to GET on the current URL, which
+  // would reload the page and leak the username into the query string.
+  // Disabling the button until mount makes that window effectively
+  // impossible to hit; method="post" below is the fallback in case it
+  // ever is (keeps the value out of the URL either way).
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    // Deliberate exception to the "don't setState in an effect" rule: this
+    // specifically needs to distinguish the initial (server-rendered, not
+    // yet hydrated) render from every render after — there's no prop or
+    // derived value that captures "has this component hydrated on the
+    // client" other than an effect that only runs post-mount.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setMounted(true);
+  }, []);
 
   async function handleUsernameSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -91,7 +109,11 @@ export default function LoginPage() {
             <p className="text-[14px] text-ink-muted-48 mb-6">
               Masukkan username Anda untuk melanjutkan.
             </p>
-            <form onSubmit={handleUsernameSubmit} className="space-y-4">
+            <form
+              onSubmit={handleUsernameSubmit}
+              method="post"
+              className="space-y-4"
+            >
               <div>
                 <Label htmlFor="username">Username</Label>
                 <Input
@@ -105,7 +127,11 @@ export default function LoginPage() {
                 />
               </div>
               <FieldError message={error ?? undefined} />
-              <Button type="submit" className="w-full" disabled={submitting}>
+              <Button
+                type="submit"
+                className="w-full"
+                disabled={submitting || !mounted}
+              >
                 {submitting ? "Memeriksa..." : "Lanjut"}
               </Button>
             </form>
@@ -138,7 +164,11 @@ export default function LoginPage() {
                 {step.manualKey}
               </span>
             </p>
-            <form onSubmit={handleCodeSubmit} className="space-y-4">
+            <form
+              onSubmit={handleCodeSubmit}
+              method="post"
+              className="space-y-4"
+            >
               <div>
                 <Label htmlFor="code">Kode Konfirmasi</Label>
                 <Input
@@ -156,7 +186,11 @@ export default function LoginPage() {
                 />
               </div>
               <FieldError message={error ?? undefined} />
-              <Button type="submit" className="w-full" disabled={submitting}>
+              <Button
+                type="submit"
+                className="w-full"
+                disabled={submitting || !mounted}
+              >
                 {submitting ? "Memverifikasi..." : "Konfirmasi & Masuk"}
               </Button>
               <button
@@ -176,7 +210,11 @@ export default function LoginPage() {
             <p className="text-[14px] text-ink-muted-48 mb-6">
               Masukkan kode dari aplikasi authenticator Anda.
             </p>
-            <form onSubmit={handleCodeSubmit} className="space-y-4">
+            <form
+              onSubmit={handleCodeSubmit}
+              method="post"
+              className="space-y-4"
+            >
               <div>
                 <Label htmlFor="code">Kode Authenticator</Label>
                 <Input
@@ -194,7 +232,11 @@ export default function LoginPage() {
                 />
               </div>
               <FieldError message={error ?? undefined} />
-              <Button type="submit" className="w-full" disabled={submitting}>
+              <Button
+                type="submit"
+                className="w-full"
+                disabled={submitting || !mounted}
+              >
                 {submitting ? "Memverifikasi..." : "Masuk"}
               </Button>
               <button
