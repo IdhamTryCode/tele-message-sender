@@ -1,14 +1,12 @@
 /**
- * Registers a new username with an activation code, but no TOTP secret
- * yet. There is no admin UI by design — adding a person means running
- * this script once, then telling them the code out-of-band (WA/lisan).
- * They complete their own TOTP setup at /aktivasi using that code — see
- * src/app/api/auth/activate/route.ts. This is what prevents anyone who
- * merely knows/guesses a registered username from claiming its TOTP
- * setup themselves.
+ * Regenerates an activation code for an existing, not-yet-confirmed user —
+ * for when their original code expired/was lost, or (as with users seeded
+ * before the activation-code feature existed) they never had one at all.
+ * Refuses for already-confirmed accounts, since those don't need
+ * reissuing — see scripts/seed-user.ts for the initial-registration path.
  *
  * Usage:
- *   npx tsx scripts/seed-user.ts <username>
+ *   npx tsx scripts/reissue-activation.ts <username>
  */
 import { neon } from "@neondatabase/serverless";
 import { drizzle } from "drizzle-orm/neon-http";
@@ -21,7 +19,7 @@ const ACTIVATION_CODE_VALID_HOURS = 48;
 async function main() {
   const username = process.argv[2]?.trim();
   if (!username) {
-    console.error("Usage: npx tsx scripts/seed-user.ts <username>");
+    console.error("Usage: npx tsx scripts/reissue-activation.ts <username>");
     process.exit(1);
   }
 
@@ -33,13 +31,19 @@ async function main() {
   const sql = neon(process.env.DATABASE_URL);
   const db = drizzle(sql, { schema });
 
-  const [existing] = await db
+  const [user] = await db
     .select()
     .from(schema.users)
     .where(eq(schema.users.username, username))
     .limit(1);
-  if (existing) {
-    console.error(`User "${username}" already exists.`);
+  if (!user) {
+    console.error(`User "${username}" not found.`);
+    process.exit(1);
+  }
+  if (user.totpConfirmedAt !== null) {
+    console.error(
+      `User "${username}" is already active (TOTP confirmed) — nothing to reissue.`
+    );
     process.exit(1);
   }
 
@@ -48,14 +52,12 @@ async function main() {
     Date.now() + ACTIVATION_CODE_VALID_HOURS * 60 * 60 * 1000
   );
 
-  await db.insert(schema.users).values({
-    username,
-    totpSecretEncrypted: null,
-    activationCode,
-    activationCodeExpiresAt,
-  });
+  await db
+    .update(schema.users)
+    .set({ activationCode, activationCodeExpiresAt })
+    .where(eq(schema.users.username, username));
 
-  console.log(`\nUser "${username}" registered.`);
+  console.log(`\nNew activation code issued for "${username}".`);
   console.log(
     `Kode aktivasi: ${activationCode} (berlaku ${ACTIVATION_CODE_VALID_HOURS} jam)`
   );

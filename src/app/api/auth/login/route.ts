@@ -63,8 +63,11 @@ export const POST = withErrorHandling(async (request: Request) => {
     return GENERIC_ERROR;
   }
 
-  // First successful login confirms setup permanently — from now on
-  // /api/auth/status stops issuing new QR codes for this username.
+  // First successful login confirms setup permanently. In practice this
+  // is already true by the time login succeeds (activation sets the TOTP
+  // secret and this check only passes once a correct code verifies
+  // against it), but the explicit set keeps the invariant self-evident
+  // here rather than only implied by /api/auth/activate's behavior.
   if (user.totpConfirmedAt === null) {
     await db
       .update(users)

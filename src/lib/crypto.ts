@@ -52,3 +52,20 @@ export function decryptSecret(payload: string): string {
   ]);
   return decrypted.toString("utf8");
 }
+
+// Excludes visually ambiguous characters (0/O, 1/I/L) since this is meant
+// to be read aloud or typed from a phone screen without transcription
+// errors — it's an activation code shared out-of-band (WA/lisan), not a
+// high-entropy credential like a session secret.
+const ACTIVATION_CODE_CHARSET = "ABCDEFGHJKMNPQRSTUVWXYZ23456789";
+const ACTIVATION_CODE_LENGTH = 8;
+
+/** Generates a one-time account activation code (see scripts/seed-user.ts). */
+export function generateActivationCode(): string {
+  const bytes = randomBytes(ACTIVATION_CODE_LENGTH);
+  let code = "";
+  for (let i = 0; i < ACTIVATION_CODE_LENGTH; i++) {
+    code += ACTIVATION_CODE_CHARSET[bytes[i] % ACTIVATION_CODE_CHARSET.length];
+  }
+  return code;
+}

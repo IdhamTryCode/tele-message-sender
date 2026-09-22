@@ -20,9 +20,11 @@ whitelist target di server, validasi berlapis, dan audit trail penuh.
 
 - **Login tanpa password** — autentikasi berbasis TOTP (Time-based One-Time
   Password), setiap user punya identitas sendiri untuk keperluan audit.
-- **Setup TOTP mandiri lewat web** — admin cukup daftarkan username; user
-  scan QR code dan konfirmasi TOTP sendiri saat login pertama kali, tidak
-  perlu bantuan admin atau akses terminal.
+- **Aktivasi akun dengan kode sekali pakai** — admin daftarkan username +
+  kode aktivasi (`seed:user`); user mengaktivasi akunnya sendiri di
+  `/aktivasi` dengan username + kode itu, lalu scan QR dan konfirmasi TOTP.
+  Tanpa kode yang benar, siapa pun yang sekadar tahu/menebak username tidak
+  bisa memicu atau mengklaim setup TOTP orang lain.
 - **Form laporan terstruktur** — judul, tanggal, deskripsi, mitigasi, dan
   lampiran gambar opsional, dengan validasi di client maupun server.
 - **Target Telegram lewat dropdown** — daftar target (grup/channel) di-resolve
@@ -90,14 +92,17 @@ Lapisan pertahanan utama:
    instance serverless di Vercel tidak berbagi memori antar request.
 6. **TOTP dengan proteksi replay**: setiap time-step yang sudah dipakai
    dicatat per user sehingga kode yang sama tidak bisa dipakai dua kali.
-   Status setup (`totpConfirmedAt`) terpisah dari keberadaan secret — QR
-   baru hanya diterbitkan ulang untuk setup yang belum pernah berhasil
-   dikonfirmasi, tidak pernah untuk akun yang sudah aktif dipakai.
-7. **Session cookie** signed JWT (HS256), `httpOnly` + `secure` +
+   Status setup (`totpConfirmedAt`) terpisah dari keberadaan secret.
+7. **Aktivasi akun butuh kode sekali pakai** (`activationCode`), bukan
+   cuma username — QR TOTP hanya pernah diterbitkan lewat `/aktivasi`
+   setelah kode itu diverifikasi, dan langsung dikonsumsi (di-null-kan)
+   begitu terpakai. Endpoint pengecekan status login (`/login`) tidak
+   pernah menerbitkan QR untuk username mana pun.
+8. **Session cookie** signed JWT (HS256), `httpOnly` + `secure` +
    `sameSite=strict`.
-8. **Security headers** (`X-Content-Type-Options`, `X-Frame-Options`,
+9. **Security headers** (`X-Content-Type-Options`, `X-Frame-Options`,
    `Content-Security-Policy`, dll) diterapkan lewat `next.config.ts`.
-9. **Error handling terpusat** — kegagalan tak terduga (mis. koneksi DB
+10. **Error handling terpusat** — kegagalan tak terduga (mis. koneksi DB
    putus) selalu dikembalikan sebagai pesan generik ke client; detail
    lengkap hanya tercatat di log server.
 
@@ -107,13 +112,15 @@ Lapisan pertahanan utama:
 src/
 ├── app/
 │   ├── login/              # Halaman login (username + kode TOTP)
+│   ├── aktivasi/            # Aktivasi akun baru (username + kode aktivasi → QR)
 │   ├── form/                # Form laporan utama (protected)
 │   ├── history/              # Riwayat pengiriman milik user (protected)
 │   └── api/
-│       ├── auth/            # Login & logout
+│       ├── auth/            # Login, aktivasi & logout
 │       └── reports/          # Submit laporan & daftar target
 ├── components/
 │   ├── ui/                  # Button, Input, Textarea, Card — primitif UI
+│   ├── totp-setup-step.tsx  # UI scan-QR-&-konfirmasi, dipakai oleh /aktivasi
 │   ├── report-form.tsx
 │   ├── report-preview-dialog.tsx
 │   └── history-table.tsx
@@ -124,11 +131,12 @@ src/
 │   ├── rate-limit.ts         # Sliding window rate limit (Postgres)
 │   ├── targets.ts            # Whitelist target Telegram
 │   ├── image.ts               # Validasi & sanitisasi gambar
-│   ├── crypto.ts              # AES-256-GCM untuk TOTP secret at rest
+│   ├── crypto.ts              # AES-256-GCM untuk TOTP secret + generator kode aktivasi
 │   └── validation/            # Skema Zod
 └── proxy.ts                  # Proteksi route (pengganti middleware.ts di Next.js 16)
 scripts/
-└── seed-user.ts               # CLI untuk mendaftarkan user baru
+├── seed-user.ts               # CLI untuk mendaftarkan user baru + kode aktivasi
+└── reissue-activation.ts      # CLI untuk menerbitkan ulang kode aktivasi yang hilang/kedaluwarsa
 ```
 
 ## Setup Lokal
@@ -192,19 +200,31 @@ npm run db:push
 
 ### 6. Tambah user pertama
 
-Tidak ada halaman admin — username didaftarkan lewat script sekali jalan
-(tanpa TOTP, itu langkah berikutnya):
+Tidak ada halaman admin — username didaftarkan lewat script sekali jalan,
+yang sekaligus menerbitkan kode aktivasi:
 
 ```bash
 npm run seed:user -- <username>
 ```
 
-User lalu menyelesaikan setup TOTP-nya sendiri: buka `/login`, masukkan
-username, sistem otomatis menampilkan QR code (karena belum ada TOTP
-terpasang) untuk di-scan dengan Google Authenticator/Authy/aplikasi TOTP
-lain, lalu masukkan kode pertama untuk konfirmasi sekaligus login. Tidak ada
-password — kode 6 digit dari aplikasi authenticator adalah satu-satunya
-kredensial.
+Script mencetak kode aktivasi (8 karakter, berlaku 48 jam). Sampaikan
+username dan kode itu ke user lewat kanal terpercaya (WA/lisan). User lalu
+mengaktivasi akunnya sendiri: buka `/aktivasi`, masukkan username + kode
+aktivasi, lalu scan QR code yang muncul dengan Google Authenticator/Authy/
+aplikasi TOTP lain, dan masukkan kode pertama untuk konfirmasi sekaligus
+login. Tanpa kode aktivasi yang benar, tidak ada QR yang diterbitkan —
+sekadar tahu/menebak username tidak cukup. Tidak ada password — kode 6
+digit dari aplikasi authenticator adalah satu-satunya kredensial setelah
+aktivasi.
+
+Kalau kode aktivasi hilang atau kedaluwarsa sebelum sempat dipakai:
+
+```bash
+npm run reissue:activation -- <username>
+```
+
+(Menolak dijalankan untuk user yang sudah aktif — tidak ada yang perlu
+diterbitkan ulang untuk akun yang sudah confirmed.)
 
 ### 7. Jalankan
 
@@ -255,30 +275,31 @@ tanpa memahami konsekuensinya:
 - **Preview/konfirmasi wajib sebelum kirim.** Pesan Telegram tidak bisa
   ditarik setelah dibaca — ini kontrol keamanan untuk mencegah salah
   target/salah isi menjadi insiden tersendiri, bukan sekadar UX.
-- **[RISIKO DITERIMA — SEDANG] Setup TOTP tanpa token undangan terpisah.**
-  Siapa pun yang tahu sebuah username terdaftar bisa memicu/mengklaim setup
-  TOTP-nya (dapat QR code) selama setup itu belum pernah berhasil
-  dikonfirmasi (`totpConfirmedAt IS NULL`) — tidak ada mekanisme invite
-  token per user. Ini pola "unclaimed account takeover" yang sudah
-  diidentifikasi lewat review (internal), bukan celah yang belum disadari.
-  **Kenapa diterima untuk sekarang:** jumlah user kecil dan diketahui
-  pribadi oleh admin (tidak ada self-signup publik, tidak ada daftar
-  username yang dipublikasikan); jendela risiko tertutup permanen per-user
-  begitu mereka berhasil login pertama kali; admin bisa memverifikasi
-  status setup lewat query `SELECT username, totp_confirmed_at FROM users`
-  kapan saja.
-  **Mitigasi operasional saat ini (tanpa ubah kode):** setelah
-  `seed:user`, admin memberi tahu user untuk **segera** menyelesaikan setup
-  (bukan menunda), dan admin memeriksa berkala apakah ada user yang lama
-  `totpConfirmedAt IS NULL` — itu jendela terbuka yang idealnya secepatnya
-  ditutup.
-  **Kapan wajib direvisit:** (a) jumlah user melewati skala "semua saling
-  kenal langsung" (kira-kira >5-10 user atau lintas divisi), (b) username
-  jadi predictable/terpublikasi (mis. pola `nama.divisi`), atau (c) ada
-  insiden nyata yang memanfaatkan celah ini. Perbaikannya: token setup
-  sekali pakai yang digenerate admin dan dikirim out-of-band, diminta
-  bersama username saat setup pertama — desainnya sudah dipetakan, tinggal
-  diimplementasikan saat salah satu kondisi di atas terpenuhi.
+- **[RESOLVED] Setup TOTP tanpa token undangan terpisah.** Sebelumnya
+  siapa pun yang tahu/menebak sebuah username terdaftar bisa
+  memicu/mengklaim setup TOTP-nya lewat `/login`, selama setup itu belum
+  pernah dikonfirmasi — celah "unclaimed account takeover" klasik yang
+  diidentifikasi lewat review keamanan eksternal. Diperbaiki dengan
+  memisahkan aktivasi akun sepenuhnya ke `/aktivasi`, yang mewajibkan kode
+  aktivasi sekali pakai (`activationCode`, digenerate saat `seed:user`,
+  dikirim admin ke user secara out-of-band) di samping username sebelum
+  QR TOTP diterbitkan sama sekali. `/login` sendiri tidak pernah lagi
+  menerbitkan QR untuk username mana pun — lihat
+  `src/app/api/auth/activate/route.ts`. Kode langsung dikonsumsi
+  (di-null-kan) begitu terpakai sekali, dan kedaluwarsa 48 jam jika tidak
+  dipakai.
+- **[RISIKO DITERIMA — RENDAH] Pesan "Akun sudah aktif" di `/aktivasi`
+  membocorkan status akun untuk username yang diketahui.** Kalau username
+  yang sudah confirmed dicoba diaktivasi ulang, responnya spesifik ("Akun
+  sudah aktif, silakan login") — bukan pesan generik yang sama seperti
+  kasus username salah/kode salah. Ini secara sadar membocorkan "username
+  ini terdaftar dan aktif" (tidak ada kredensial yang bocor) demi UX yang
+  jauh lebih baik untuk user yang salah nyasar ke halaman aktivasi
+  (misalnya lupa sudah pernah aktivasi). **Kapan wajib direvisit:** kalau
+  daftar username jadi predictable/mudah ditebak dan kebocoran status
+  "aktif/tidak" dinilai berisiko (mis. dipakai untuk social engineering
+  bertarget) — perbaikannya cukup mengganti pesan ini jadi generik juga,
+  tanpa perubahan arsitektur.
 - **[RISIKO DITERIMA — RENDAH] CSP `script-src` memakai `'unsafe-inline'`.**
   Next.js App Router menyuntikkan inline script untuk data hydration RSC
   di setiap halaman, termasuk yang di-prerender statis (`/login` adalah

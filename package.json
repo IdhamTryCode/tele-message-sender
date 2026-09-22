@@ -9,7 +9,8 @@
     "lint": "eslint",
     "db:generate": "drizzle-kit generate",
     "db:push": "drizzle-kit push",
-    "seed:user": "tsx --env-file=.env.local scripts/seed-user.ts"
+    "seed:user": "tsx --env-file=.env.local scripts/seed-user.ts",
+    "reissue:activation": "tsx --env-file=.env.local scripts/reissue-activation.ts"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.9.1",
