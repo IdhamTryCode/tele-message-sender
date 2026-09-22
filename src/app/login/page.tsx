@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Spinner } from "@/components/ui/spinner";
 import { Card, Label, FieldError } from "@/components/ui/card";
 
 type Step =
@@ -129,9 +130,10 @@ export default function LoginPage() {
               <FieldError message={error ?? undefined} />
               <Button
                 type="submit"
-                className="w-full"
+                className="w-full gap-2"
                 disabled={submitting || !mounted}
               >
+                {submitting && <Spinner />}
                 {submitting ? "Memeriksa..." : "Lanjut"}
               </Button>
             </form>
@@ -188,9 +190,10 @@ export default function LoginPage() {
               <FieldError message={error ?? undefined} />
               <Button
                 type="submit"
-                className="w-full"
+                className="w-full gap-2"
                 disabled={submitting || !mounted}
               >
+                {submitting && <Spinner />}
                 {submitting ? "Memverifikasi..." : "Konfirmasi & Masuk"}
               </Button>
               <button
@@ -234,9 +237,10 @@ export default function LoginPage() {
               <FieldError message={error ?? undefined} />
               <Button
                 type="submit"
-                className="w-full"
+                className="w-full gap-2"
                 disabled={submitting || !mounted}
               >
+                {submitting && <Spinner />}
                 {submitting ? "Memverifikasi..." : "Masuk"}
               </Button>
               <button

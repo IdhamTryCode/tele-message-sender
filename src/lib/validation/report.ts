@@ -25,7 +25,9 @@ export const reportSchema = z.object({
     .trim()
     .min(10, "Mitigasi minimal 10 karakter")
     .max(3000, "Mitigasi maksimal 3000 karakter"),
-  targetKey: z.string().min(1, "Target wajib dipilih"),
+  targetKeys: z
+    .array(z.string())
+    .min(1, "Pilih minimal satu target"),
 });
 
 export type ReportInput = z.infer<typeof reportSchema>;

@@ -2,11 +2,12 @@
 
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { Spinner } from "@/components/ui/spinner";
 import type { ReportInput } from "@/lib/validation/report";
 
 interface Props {
   data: ReportInput;
-  targetLabel: string;
+  targetLabels: string[];
   imagePreviewUrl: string | null;
   submitting: boolean;
   onConfirm: () => void;
@@ -21,7 +22,7 @@ interface Props {
  */
 export function ReportPreviewDialog({
   data,
-  targetLabel,
+  targetLabels,
   imagePreviewUrl,
   submitting,
   onConfirm,
@@ -40,7 +41,7 @@ export function ReportPreviewDialog({
         <dl className="space-y-3 text-[14px]">
           <div>
             <dt className="font-semibold text-ink-muted-80">Target</dt>
-            <dd className="text-ink">{targetLabel}</dd>
+            <dd className="text-ink">{targetLabels.join(", ")}</dd>
           </div>
           <div>
             <dt className="font-semibold text-ink-muted-80">Judul</dt>
@@ -84,7 +85,12 @@ export function ReportPreviewDialog({
           >
             Kembali
           </Button>
-          <Button onClick={onConfirm} disabled={submitting} className="flex-1">
+          <Button
+            onClick={onConfirm}
+            disabled={submitting}
+            className="flex-1 gap-2"
+          >
+            {submitting && <Spinner />}
             {submitting ? "Mengirim..." : "Kirim ke Telegram"}
           </Button>
         </div>

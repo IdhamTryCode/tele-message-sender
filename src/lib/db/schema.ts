@@ -39,12 +39,15 @@ export const reports = pgTable("reports", {
   deskripsi: text("deskripsi").notNull(),
   mitigasi: text("mitigasi").notNull(),
   hasImage: boolean("has_image").notNull().default(false),
-  // Public target key ("soc", "mgmt", ...) — never the raw Telegram chat ID.
-  targetKey: varchar("target_key", { length: 50 }).notNull(),
+  // JSON-stringified array of public target keys (e.g. '["soc","test-group"]')
+  // — never raw Telegram chat IDs. One report can go to multiple targets;
+  // this is one audit row per submission, not per target (see status below
+  // for how partial multi-target failures are represented).
+  targetKeys: text("target_keys").notNull(),
   // Username from the session, not from client-supplied body — set by the
   // route handler, never trusted from request input.
   submittedBy: varchar("submitted_by", { length: 50 }).notNull(),
-  status: varchar("status", { length: 20 }).notNull(), // "sent" | "failed"
+  status: varchar("status", { length: 20 }).notNull(), // "sent" | "failed" | "partial"
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 

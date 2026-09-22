@@ -3,8 +3,10 @@ import { desc, eq } from "drizzle-orm";
 import { getSession } from "@/lib/auth/session";
 import { db } from "@/lib/db";
 import { reports } from "@/lib/db/schema";
+import { getPublicTargets } from "@/lib/targets";
 import { HistoryTable } from "@/components/history-table";
 import { LogoutButton } from "@/components/logout-button";
+import { SubmitNotice } from "@/components/submit-notice";
 
 export default async function HistoryPage() {
   const session = await getSession();
@@ -25,7 +27,7 @@ export default async function HistoryPage() {
 
   return (
     <main className="flex flex-1 flex-col items-center px-4 py-12">
-      <div className="w-full max-w-3xl mb-6 flex items-center justify-between">
+      <div className="w-full max-w-3xl mb-6 flex flex-wrap items-center justify-between gap-2">
         <h1 className="text-[28px] font-semibold text-ink">Riwayat Saya</h1>
         <div className="flex items-center gap-4 text-[14px]">
           <Link href="/form" className="text-primary hover:underline">
@@ -35,7 +37,13 @@ export default async function HistoryPage() {
         </div>
       </div>
       <div className="w-full max-w-3xl">
-        <HistoryTable reports={rows} />
+        <SubmitNotice />
+        <HistoryTable
+          reports={rows}
+          targetLabels={Object.fromEntries(
+            getPublicTargets().map((t) => [t.key, t.label])
+          )}
+        />
       </div>
     </main>
   );

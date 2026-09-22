@@ -8,7 +8,7 @@ export default async function FormPage() {
 
   return (
     <main className="flex flex-1 flex-col items-center px-4 py-12">
-      <div className="w-full max-w-2xl mb-4 flex items-center justify-between">
+      <div className="w-full max-w-2xl mb-4 flex flex-wrap items-center justify-between gap-2">
         <span className="text-[14px] text-ink-muted-48">
           Masuk sebagai <strong className="text-ink">{session?.username}</strong>
         </span>

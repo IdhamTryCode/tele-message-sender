@@ -55,12 +55,22 @@ export const POST = withErrorHandling(async (request: Request) => {
     return NextResponse.json({ error: "Invalid form data" }, { status: 400 });
   }
 
+  // Client sends target keys as a JSON-stringified array (FormData has no
+  // clean native array support paired with fetch); malformed JSON is just
+  // another validation failure, not a special case.
+  let targetKeysRaw: unknown;
+  try {
+    targetKeysRaw = JSON.parse(String(formData.get("targetKeys") ?? "[]"));
+  } catch {
+    return NextResponse.json({ error: "Target tidak valid" }, { status: 400 });
+  }
+
   const parsed = reportSchema.safeParse({
     judul: formData.get("judul"),
     tanggal: formData.get("tanggal"),
     deskripsi: formData.get("deskripsi"),
     mitigasi: formData.get("mitigasi"),
-    targetKey: formData.get("targetKey"),
+    targetKeys: targetKeysRaw,
   });
   if (!parsed.success) {
     return NextResponse.json(
@@ -68,13 +78,22 @@ export const POST = withErrorHandling(async (request: Request) => {
       { status: 400 }
     );
   }
-  const { judul, tanggal, deskripsi, mitigasi, targetKey } = parsed.data;
+  const { judul, tanggal, deskripsi, mitigasi, targetKeys } = parsed.data;
 
-  // Server-side whitelist check — the client only ever sent a key, this is
-  // where it gets resolved to (or rejected as not being) a real chat ID.
-  const chatId = resolveTargetChatId(targetKey);
-  if (!chatId) {
-    return NextResponse.json({ error: "Target tidak valid" }, { status: 400 });
+  // Server-side whitelist check — the client only ever sent keys, this is
+  // where each one gets resolved to (or rejected as not being) a real chat
+  // ID. Fail closed: if ANY key isn't whitelisted, reject the whole
+  // request rather than silently sending to a subset.
+  const chatIds: string[] = [];
+  for (const key of targetKeys) {
+    const chatId = resolveTargetChatId(key);
+    if (!chatId) {
+      return NextResponse.json(
+        { error: "Target tidak valid" },
+        { status: 400 }
+      );
+    }
+    chatIds.push(chatId);
   }
 
   const imageFile = formData.get("image");
@@ -101,38 +120,52 @@ export const POST = withErrorHandling(async (request: Request) => {
     submittedBy: session.username,
   });
 
-  let status: "sent" | "failed" = "sent";
-  try {
-    if (sanitizedImage) {
-      if (fitsAsCaption(message)) {
-        await sendTelegramPhoto(
-          chatId,
-          message,
-          sanitizedImage.buffer,
-          `report.${sanitizedImage.extension}`
-        );
+  // Sent sequentially (not Promise.all) — keeps Telegram rate-limit
+  // behavior predictable and per-target error attribution simple at this
+  // scale (2 targets today).
+  let successCount = 0;
+  for (const chatId of chatIds) {
+    try {
+      if (sanitizedImage) {
+        if (fitsAsCaption(message)) {
+          await sendTelegramPhoto(
+            chatId,
+            message,
+            sanitizedImage.buffer,
+            `report.${sanitizedImage.extension}`
+          );
+        } else {
+          // Caption limit (1024) is shorter than message limit (4096) — if
+          // the full report doesn't fit as a caption, send the photo with
+          // a short caption and the full text as a follow-up message.
+          await sendTelegramPhoto(
+            chatId,
+            `Laporan: ${judul}\n(lihat pesan berikutnya untuk detail lengkap)`,
+            sanitizedImage.buffer,
+            `report.${sanitizedImage.extension}`
+          );
+          await sendTelegramMessage(chatId, message);
+        }
       } else {
-        // Caption limit (1024) is shorter than message limit (4096) — if the
-        // full report doesn't fit as a caption, send the photo with a short
-        // caption and the full text as a follow-up message.
-        await sendTelegramPhoto(
-          chatId,
-          `Laporan: ${judul}\n(lihat pesan berikutnya untuk detail lengkap)`,
-          sanitizedImage.buffer,
-          `report.${sanitizedImage.extension}`
-        );
         await sendTelegramMessage(chatId, message);
       }
-    } else {
-      await sendTelegramMessage(chatId, message);
-    }
-  } catch (err) {
-    if (err instanceof TelegramSendError) {
-      status = "failed";
-    } else {
+      successCount++;
+    } catch (err) {
+      if (err instanceof TelegramSendError) {
+        // Continue to the remaining targets — one failing shouldn't stop
+        // delivery to the others.
+        continue;
+      }
       throw err;
     }
   }
+
+  const status: "sent" | "failed" | "partial" =
+    successCount === chatIds.length
+      ? "sent"
+      : successCount === 0
+        ? "failed"
+        : "partial";
 
   await db.insert(reports).values({
     judul,
@@ -140,7 +173,7 @@ export const POST = withErrorHandling(async (request: Request) => {
     deskripsi,
     mitigasi,
     hasImage: sanitizedImage !== null,
-    targetKey,
+    targetKeys: JSON.stringify(targetKeys),
     submittedBy: session.username,
     status,
   });
@@ -150,6 +183,14 @@ export const POST = withErrorHandling(async (request: Request) => {
       { error: "Gagal mengirim ke Telegram. Silakan coba lagi." },
       { status: 502 }
     );
+  }
+
+  if (status === "partial") {
+    return NextResponse.json({
+      ok: true,
+      partial: true,
+      message: `Terkirim ke ${successCount} dari ${chatIds.length} target. Cek riwayat untuk detail.`,
+    });
   }
 
   return NextResponse.json({ ok: true });
