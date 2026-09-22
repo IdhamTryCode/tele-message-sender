@@ -7,6 +7,7 @@ import {
   serial,
   text,
   timestamp,
+  unique,
   varchar,
 } from "drizzle-orm/pg-core";
 
@@ -64,16 +65,26 @@ export const reports = pgTable("reports", {
 });
 
 /**
- * Sliding-window rate limit counters, backed by Postgres because Vercel's
+ * Fixed-window rate limit counters, backed by Postgres because Vercel's
  * serverless functions don't share in-memory state between invocations.
- * `identifier` is e.g. "login:alice" or "submit:alice".
+ * `identifier` is e.g. "login:alice" or "submit:alice". `windowKey` is
+ * Unix time floor-divided by the caller's window length, so each
+ * (identifier, windowKey) pair names one time bucket. Checking and
+ * incrementing happen as a single atomic UPSERT (see checkRateLimit) —
+ * deliberately not a separate SELECT-then-INSERT, which was a check-then-act
+ * race: concurrent requests could all read the same pre-increment count and
+ * all pass, letting a burst blow past maxAttempts entirely.
  */
-export const rateLimits = pgTable("rate_limits", {
-  id: serial("id").primaryKey(),
-  identifier: varchar("identifier", { length: 100 }).notNull(),
-  windowStart: timestamp("window_start").notNull(),
-  count: integer("count").notNull().default(1),
-});
+export const rateLimits = pgTable(
+  "rate_limits",
+  {
+    id: serial("id").primaryKey(),
+    identifier: varchar("identifier", { length: 100 }).notNull(),
+    windowKey: bigint("window_key", { mode: "number" }).notNull(),
+    count: integer("count").notNull().default(1),
+  },
+  (table) => [unique().on(table.identifier, table.windowKey)]
+);
 
 /**
  * Prevents a single TOTP code from being accepted twice within its validity

@@ -1,12 +1,20 @@
-import { and, eq, gt, sql } from "drizzle-orm";
+import { sql } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { rateLimits } from "@/lib/db/schema";
 
 /**
- * Sliding-window rate limit backed by Postgres. Deliberately not in-memory:
+ * Fixed-window rate limit backed by Postgres. Deliberately not in-memory:
  * on Vercel, each request can land on a different serverless instance, and
  * instances get recycled — an in-memory Map would reset constantly and
  * never actually block anything. See README for the reasoning.
+ *
+ * The check-and-increment is a single atomic UPSERT (INSERT ... ON
+ * CONFLICT DO UPDATE ... RETURNING), not a SELECT followed by an INSERT.
+ * The previous SELECT-then-INSERT version had a TOCTOU race: concurrent
+ * requests could all read the same pre-increment count, all see it under
+ * the limit, and all insert — letting a burst exceed maxAttempts. The
+ * UPSERT closes that gap because Postgres serializes concurrent writers on
+ * the same (identifier, windowKey) row.
  *
  * Usage: checkRateLimit("login:alice", 5, 15 * 60) -> max 5 attempts per 15 min.
  */
@@ -15,29 +23,16 @@ export async function checkRateLimit(
   maxAttempts: number,
   windowSeconds: number
 ): Promise<{ allowed: boolean }> {
-  const windowStart = new Date(Date.now() - windowSeconds * 1000);
+  const windowKey = Math.floor(Date.now() / 1000 / windowSeconds);
 
-  const rows = await db
-    .select({ total: sql<number>`coalesce(sum(${rateLimits.count}), 0)` })
-    .from(rateLimits)
-    .where(
-      and(
-        eq(rateLimits.identifier, identifier),
-        gt(rateLimits.windowStart, windowStart)
-      )
-    );
+  const [row] = await db
+    .insert(rateLimits)
+    .values({ identifier, windowKey, count: 1 })
+    .onConflictDoUpdate({
+      target: [rateLimits.identifier, rateLimits.windowKey],
+      set: { count: sql`${rateLimits.count} + 1` },
+    })
+    .returning({ count: rateLimits.count });
 
-  const currentCount = Number(rows[0]?.total ?? 0);
-
-  if (currentCount >= maxAttempts) {
-    return { allowed: false };
-  }
-
-  await db.insert(rateLimits).values({
-    identifier,
-    windowStart: new Date(),
-    count: 1,
-  });
-
-  return { allowed: true };
+  return { allowed: row.count <= maxAttempts };
 }

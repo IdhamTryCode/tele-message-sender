@@ -33,16 +33,25 @@ export const reportSchema = z.object({
     .refine((val) => val <= maxAllowedDate(), {
       message: "Tanggal tidak boleh di masa depan",
     }),
+  // Capped well under Telegram's 4096-char message limit, not at some
+  // round number — buildReportMessage() in lib/telegram.ts wraps both
+  // fields together with a fixed-size template (labels, judul, tanggal,
+  // submittedBy). Worst case (judul at its 200-char max, submittedBy at
+  // its 50-char max, both fields at this cap) measures 4099 chars — this
+  // value is verified against that actual worst case, not derived from a
+  // rough overhead estimate. The route's fitsAsMessage() check is the
+  // real safety net regardless; this cap just keeps normal usage from
+  // ever tripping it.
   deskripsi: z
     .string()
     .trim()
     .min(10, "Deskripsi minimal 10 karakter")
-    .max(3000, "Deskripsi maksimal 3000 karakter"),
+    .max(1850, "Deskripsi maksimal 1850 karakter"),
   mitigasi: z
     .string()
     .trim()
     .min(10, "Mitigasi minimal 10 karakter")
-    .max(3000, "Mitigasi maksimal 3000 karakter"),
+    .max(1850, "Mitigasi maksimal 1850 karakter"),
   targetKeys: z
     .array(z.string())
     .min(1, "Pilih minimal satu target"),

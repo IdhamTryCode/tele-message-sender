@@ -19,8 +19,8 @@ interface Target {
 }
 
 const SKIP_PREVIEW_KEY = "skipReportPreview";
-const DESKRIPSI_MAX = 3000;
-const MITIGASI_MAX = 3000;
+const DESKRIPSI_MAX = 1850;
+const MITIGASI_MAX = 1850;
 
 function readSkipPreview(): boolean {
   if (typeof window === "undefined") return false;

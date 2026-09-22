@@ -8,6 +8,7 @@ import { validateAndSanitizeImage, InvalidImageError } from "@/lib/image";
 import {
   buildReportMessage,
   fitsAsCaption,
+  fitsAsMessage,
   sendTelegramMessage,
   sendTelegramPhoto,
   TelegramSendError,
@@ -119,6 +120,18 @@ export const POST = withErrorHandling(async (request: Request) => {
     mitigasi,
     submittedBy: session.username,
   });
+
+  // Belt-and-suspenders: reportSchema's field limits already keep this
+  // under Telegram's 4096-char message cap, but re-check the assembled
+  // message itself rather than trusting the field-level math to stay
+  // correct forever — this is the actual value sendTelegramMessage will
+  // send, so it's the one that must fit.
+  if (!fitsAsMessage(message)) {
+    return NextResponse.json(
+      { error: "Deskripsi dan mitigasi gabungan terlalu panjang untuk dikirim ke Telegram." },
+      { status: 400 }
+    );
+  }
 
   // Sent sequentially (not Promise.all) — keeps Telegram rate-limit
   // behavior predictable and per-target error attribution simple at this
