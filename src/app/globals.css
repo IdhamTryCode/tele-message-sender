@@ -1,26 +1,63 @@
 @import "tailwindcss";
 
+/*
+ * Design tokens sourced from DESIGN.md (Apple reference), narrowed to the
+ * subset relevant to a forms/utility surface rather than marketing hero
+ * tiles: single Action Blue accent, ink/parchment surfaces, pill buttons,
+ * rounded.lg cards, 8px-based spacing, one soft shadow used sparingly.
+ */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --color-primary: #0066cc;
+  --color-primary-focus: #0071e3;
+  --color-ink: #1d1d1f;
+  --color-ink-muted-80: #333333;
+  --color-ink-muted-48: #7a7a7a;
+  --color-canvas: #ffffff;
+  --color-canvas-parchment: #f5f5f7;
+  --color-hairline: #e0e0e0;
+  --color-danger: #d70015;
+  --color-success: #1a7f37;
+
+  --background: var(--color-canvas-parchment);
+  --foreground: var(--color-ink);
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --color-primary: var(--color-primary);
+  --color-primary-focus: var(--color-primary-focus);
+  --color-ink: var(--color-ink);
+  --color-ink-muted-80: var(--color-ink-muted-80);
+  --color-ink-muted-48: var(--color-ink-muted-48);
+  --color-canvas: var(--color-canvas);
+  --color-canvas-parchment: var(--color-canvas-parchment);
+  --color-hairline: var(--color-hairline);
+  --color-danger: var(--color-danger);
+  --color-success: var(--color-success);
+  --font-sans: var(--font-inter);
+  --radius-lg: 18px;
+  --radius-pill: 9999px;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+    --background: #1d1d1f;
+    --foreground: #ffffff;
+    --color-canvas: #272729;
+    --color-canvas-parchment: #1d1d1f;
+    --color-hairline: #3a3a3c;
+    --color-ink: #ffffff;
+    --color-ink-muted-80: #cccccc;
+    --color-ink-muted-48: #a0a0a0;
   }
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-sans), system-ui, -apple-system, sans-serif;
+  font-size: 17px;
+  line-height: 1.47;
+  letter-spacing: -0.374px;
 }

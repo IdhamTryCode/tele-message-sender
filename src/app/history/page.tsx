@@ -1,0 +1,42 @@
+import Link from "next/link";
+import { desc, eq } from "drizzle-orm";
+import { getSession } from "@/lib/auth/session";
+import { db } from "@/lib/db";
+import { reports } from "@/lib/db/schema";
+import { HistoryTable } from "@/components/history-table";
+import { LogoutButton } from "@/components/logout-button";
+
+export default async function HistoryPage() {
+  const session = await getSession();
+
+  // Defense in depth: proxy already redirects unauthenticated visits, but
+  // this route re-derives the session itself rather than trusting proxy
+  // (see src/proxy.ts for why). session is guaranteed non-null in practice
+  // here since proxy protects this path, but we still scope the query to
+  // the current user only — never all users' reports.
+  const rows = session
+    ? await db
+        .select()
+        .from(reports)
+        .where(eq(reports.submittedBy, session.username))
+        .orderBy(desc(reports.createdAt))
+        .limit(100)
+    : [];
+
+  return (
+    <main className="flex flex-1 flex-col items-center px-4 py-12">
+      <div className="w-full max-w-3xl mb-6 flex items-center justify-between">
+        <h1 className="text-[28px] font-semibold text-ink">Riwayat Saya</h1>
+        <div className="flex items-center gap-4 text-[14px]">
+          <Link href="/form" className="text-primary hover:underline">
+            Laporan Baru
+          </Link>
+          <LogoutButton />
+        </div>
+      </div>
+      <div className="w-full max-w-3xl">
+        <HistoryTable reports={rows} />
+      </div>
+    </main>
+  );
+}

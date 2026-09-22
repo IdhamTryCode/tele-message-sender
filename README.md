@@ -1,36 +1,131 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Tele Message Sender
 
-## Getting Started
+Aplikasi internal untuk mengirim laporan (judul, tanggal, deskripsi, mitigasi,
+gambar opsional) ke grup Telegram tertentu, dengan login TOTP per-user, audit
+trail, dan beberapa lapisan validasi di server.
 
-First, run the development server:
+## Stack
+
+Next.js 16 (App Router) + TypeScript, Tailwind CSS v4, Drizzle ORM + Neon
+Postgres, Zod, React Hook Form, otplib (TOTP), jose (session JWT), file-type
+(magic byte detection), sharp (EXIF stripping). Tidak ada dependency Telegram
+pihak ketiga — hanya `fetch()` langsung ke Bot API. Semua gratis: Neon free
+tier, Vercel Hobby.
+
+## Setup
+
+### 1. Bot Telegram
+
+1. Chat `@BotFather` di Telegram, kirim `/newbot`, ikuti instruksinya.
+2. Simpan token yang diberikan sebagai `TELEGRAM_BOT_TOKEN`.
+3. Tambahkan bot ke grup/channel target, jadikan admin (supaya bisa kirim
+   pesan/foto).
+4. Dapatkan chat ID grup: kirim pesan apa saja ke grup, lalu buka
+   `https://api.telegram.org/bot<TOKEN>/getUpdates` dan cari `"chat":{"id":...}`.
+   Chat ID grup biasanya negatif (misal `-1001234567890`).
+
+### 2. Database (Neon)
+
+Buat database Postgres gratis di [console.neon.tech](https://console.neon.tech)
+(atau via Vercel Dashboard → Storage → Create Database → Neon Postgres, yang
+otomatis mengisi `DATABASE_URL` di Vercel env vars). Salin connection string.
+
+### 3. Environment variables
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+cp .env.example .env.local
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Isi semua nilai di `.env.local`:
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+- `DATABASE_URL` — dari Neon.
+- `TELEGRAM_BOT_TOKEN` — dari @BotFather.
+- `TG_CHAT_SOC`, `TG_CHAT_MGMT`, dst — satu env var per target dropdown.
+  Client tidak pernah mengirim chat ID asli; hanya key (`"soc"`, `"mgmt"`)
+  yang dipetakan ke chat ID ini di server (lihat `src/lib/targets.ts`). Untuk
+  menambah target baru: tambahkan env var + entri di `src/lib/targets.ts`.
+- `SESSION_SECRET` dan `TOTP_ENCRYPTION_KEY` — generate masing-masing dengan:
+  ```bash
+  node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+  ```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+### 4. Migrasi database
 
-## Learn More
+```bash
+npm run db:push
+```
 
-To learn more about Next.js, take a look at the following resources:
+### 5. Tambah user
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+Tidak ada halaman admin — user ditambahkan lewat script sekali jalan:
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+```bash
+npm run seed:user -- <username>
+```
 
-## Deploy on Vercel
+Script mencetak QR code di terminal. Scan dengan Google Authenticator, Authy,
+atau aplikasi TOTP lain. Tidak ada password — kode 6 digit dari aplikasi
+authenticator adalah satu-satunya kredensial.
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+### 6. Jalankan
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+```bash
+npm install
+npm run dev
+```
+
+## Deploy ke Vercel
+
+1. Push repo ke GitHub, import project di Vercel.
+2. Set semua environment variable dari `.env.local` di Vercel Dashboard →
+   Settings → Environment Variables.
+3. Deploy. Jalankan `npm run seed:user -- <username>` dari lokal (dengan
+   `DATABASE_URL` yang sama) untuk menambah user setelah deploy.
+
+## Keputusan keamanan (dan alasannya)
+
+Beberapa keputusan yang mungkin terlihat tidak konvensional, dijelaskan
+supaya tidak "diperbaiki" tanpa sadar konsekuensinya:
+
+- **Login TOTP tanpa password.** Tidak ada SSO korporat yang tersedia; TOTP
+  saja memberi identitas per-user (untuk audit trail) tanpa beban maintenance
+  password (reset flow, hashing policy, dll). Kode replay-protected dan
+  rate-limited.
+- **Rate limit disimpan di Postgres, bukan in-memory.** Vercel serverless
+  functions tidak berbagi memori antar invocation — `Map()` di memori akan
+  reset terus-menerus dan tidak pernah benar-benar membatasi apa pun.
+- **Pesan Telegram dikirim sebagai plain text, tanpa `parse_mode`.**
+  MarkdownV2 butuh escape ~18 karakter khusus; salah sedikit, Telegram
+  menolak pesan (400) atau formatting rusak akibat input user. Plain text
+  menghindari seluruh kelas bug ini.
+- **Gambar divalidasi lewat magic bytes (`file-type`), bukan MIME/ekstensi
+  dari client** — keduanya trivial dipalsukan. Gambar juga di-re-encode lewat
+  `sharp` untuk menghapus EXIF (termasuk koordinat GPS) sebelum dikirim, dan
+  tidak pernah ditulis ke disk.
+- **Isi laporan tidak dienkripsi di level aplikasi.** Neon sudah encrypt at
+  rest secara default (melindungi dari pencurian disk fisik), dan untuk
+  tingkat sensitivitas data operasional ini dinilai proporsional. TOTP
+  secret tetap dienkripsi (AES-256-GCM) karena itu kredensial akses, bukan
+  isi laporan — kelas risiko yang berbeda.
+- **Preview/konfirmasi sebelum kirim.** Pesan Telegram tidak bisa ditarik
+  setelah dibaca — ini kontrol keamanan (mencegah salah target/salah isi
+  jadi insiden sendiri), bukan sekadar UX.
+
+## Catatan untuk didokumentasikan ke atasan
+
+Telegram bukan medium terenkripsi end-to-end untuk grup — isi pesan
+tersimpan di server Telegram, di luar kendali organisasi. Untuk laporan
+tingkat operasional ini dinilai dapat diterima. Kalau ke depannya isi
+laporan memuat detail kerentanan yang belum ditambal atau data yang lebih
+sensitif, keputusan ini perlu ditinjau ulang (misalnya menimbang medium lain
+atau enkripsi tambahan).
+
+## Known limitation
+
+`drizzle-kit` (dev-only, tidak ikut deploy) menarik versi `esbuild` lama
+lewat dependency `@esbuild-kit/*` yang sudah terintegrasi ke `tsx`, dengan
+satu moderate vulnerability (dev server esbuild bisa menerima request dari
+origin manapun). Ini hanya berdampak saat menjalankan `drizzle-kit`/`tsx`
+secara lokal, tidak pernah ikut ke production build atau runtime Vercel.
+Versi `drizzle-kit` yang memperbaikinya masih rilis candidate (belum stable)
+per September 2026, jadi belum di-upgrade paksa.
