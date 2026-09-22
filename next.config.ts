@@ -29,7 +29,10 @@ const nextConfig: NextConfig = {
               `script-src 'self' 'unsafe-inline'${isDev ? " 'unsafe-eval'" : ""}`,
               "style-src 'self' 'unsafe-inline' fonts.googleapis.com",
               "font-src 'self' fonts.gstatic.com",
-              "img-src 'self' data:",
+              // blob: is required for the report form's image preview,
+              // which uses URL.createObjectURL(file) on the user's
+              // locally-selected image before it's ever uploaded.
+              "img-src 'self' data: blob:",
               "connect-src 'self'",
               "frame-ancestors 'none'",
               "base-uri 'self'",
