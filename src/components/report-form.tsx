@@ -108,16 +108,46 @@ export function ReportForm() {
     };
   }, [imagePreviewUrl]);
 
-  function handleImageChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0] ?? null;
+  // Shared by both the file picker and paste-from-clipboard so the same
+  // size check applies regardless of how the image arrived — dimension/
+  // magic-byte validation still happens server-side in lib/image.ts
+  // either way, this is just the client-side size precheck for fast
+  // feedback.
+  function applyImageFile(file: File) {
     setImageError(null);
-    if (file && file.size > MAX_IMAGE_BYTES) {
+    if (file.size > MAX_IMAGE_BYTES) {
       setImageError("Ukuran gambar maksimal 5MB");
       setImageFile(null);
       if (fileInputRef.current) fileInputRef.current.value = "";
       return;
     }
     setImageFile(file);
+  }
+
+  function handleImageChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0] ?? null;
+    if (file) {
+      applyImageFile(file);
+    } else {
+      setImageError(null);
+      setImageFile(null);
+    }
+  }
+
+  // Lets a staff member paste a screenshot straight from the clipboard
+  // (e.g. after Win+Shift+S) instead of having to save it to a file and
+  // then browse for it — meaningful time saved during an active incident.
+  // Only intercepts the paste when it actually carries image data; a
+  // normal text paste into judul/deskripsi/etc. is left untouched.
+  function handlePaste(e: React.ClipboardEvent<HTMLDivElement>) {
+    const item = Array.from(e.clipboardData.items).find((it) =>
+      it.type.startsWith("image/")
+    );
+    if (!item) return;
+    const file = item.getAsFile();
+    if (!file) return;
+    e.preventDefault();
+    applyImageFile(file);
   }
 
   async function doSubmit() {
@@ -181,7 +211,7 @@ export function ReportForm() {
 
   return (
     <>
-      <Card className="w-full max-w-2xl">
+      <Card className="w-full max-w-2xl" onPaste={handlePaste}>
         <form onSubmit={onOpenPreview} method="post" className="space-y-5">
           <div>
             <Label htmlFor="judul">
@@ -275,8 +305,16 @@ export function ReportForm() {
               className="block w-full text-[14px] text-ink-muted-80 file:mr-4 file:rounded-pill file:border-0 file:bg-canvas-parchment file:px-4 file:py-2 file:text-[14px] file:font-semibold file:text-ink-muted-80"
             />
             <p className="mt-1 text-[12px] text-ink-muted-48">
-              JPEG, PNG, atau WebP. Maksimal 5MB. Metadata EXIF (termasuk lokasi) akan dihapus otomatis sebelum dikirim.
+              JPEG, PNG, atau WebP. Maksimal 5MB. Metadata EXIF (termasuk lokasi) akan dihapus otomatis sebelum dikirim. Bisa juga tempel langsung (Ctrl+V) setelah screenshot.
             </p>
+            {imagePreviewUrl && (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={imagePreviewUrl}
+                alt="Preview gambar terlampir"
+                className="mt-2 max-h-32 rounded-lg border border-hairline"
+              />
+            )}
             <FieldError message={imageError ?? undefined} />
           </div>
 
