@@ -44,9 +44,10 @@ export const POST = withErrorHandling(async (request: Request) => {
     .where(eq(users.username, username))
     .limit(1);
 
-  // Same generic response whether the username doesn't exist or the code is
-  // wrong — avoids leaking which usernames are registered.
-  if (!user) {
+  // Same generic response whether the username doesn't exist, hasn't
+  // finished TOTP setup yet, or the code is wrong — avoids leaking which
+  // usernames are registered or their setup state.
+  if (!user || user.totpSecretEncrypted === null) {
     return GENERIC_ERROR;
   }
 
@@ -60,6 +61,15 @@ export const POST = withErrorHandling(async (request: Request) => {
   const isValid = await verifyTotpCode(username, secret, code);
   if (!isValid) {
     return GENERIC_ERROR;
+  }
+
+  // First successful login confirms setup permanently — from now on
+  // /api/auth/status stops issuing new QR codes for this username.
+  if (user.totpConfirmedAt === null) {
+    await db
+      .update(users)
+      .set({ totpConfirmedAt: new Date() })
+      .where(eq(users.username, username));
   }
 
   await createSession(username);

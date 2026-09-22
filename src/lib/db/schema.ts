@@ -17,7 +17,17 @@ export const users = pgTable("users", {
   // AES-256-GCM encrypted (see src/lib/crypto.ts) — this is a login
   // credential, unlike report content which is left unencrypted at the app
   // level (see README for the reasoning behind that distinction).
-  totpSecretEncrypted: text("totp_secret_encrypted").notNull(),
+  // Nullable: null means the user is registered but hasn't started TOTP
+  // setup yet (see src/app/api/auth/status/route.ts). A non-null value
+  // here does NOT by itself mean setup is complete — see totpConfirmedAt.
+  totpSecretEncrypted: text("totp_secret_encrypted"),
+  // Null until the user's first successful login with this secret. Setup
+  // status is "not started" (secret null), "pending" (secret set,
+  // confirmedAt null — a QR was issued but never successfully scanned+
+  // verified), or "confirmed" (both set). Only "not started" and "pending"
+  // get a fresh QR from /api/auth/status; "confirmed" always goes straight
+  // to code entry.
+  totpConfirmedAt: timestamp("totp_confirmed_at"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 

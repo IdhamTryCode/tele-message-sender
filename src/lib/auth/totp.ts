@@ -14,12 +14,12 @@ function makeTotp(secret?: string) {
   return new TOTP({ secret, issuer: ISSUER, crypto, base32 });
 }
 
-/** Used only by scripts/seed-user.ts when registering a new user. */
+/** Used by /api/auth/status when a user's TOTP hasn't been set up yet. */
 export function generateTotpSecret(): string {
   return makeTotp().generateSecret();
 }
 
-/** Used only by scripts/seed-user.ts to build the QR-code setup URI. */
+/** Used by /api/auth/status to build the QR-code setup URI. */
 export function buildTotpUri(secret: string, username: string): string {
   return makeTotp(secret).toURI({ label: username, issuer: ISSUER });
 }

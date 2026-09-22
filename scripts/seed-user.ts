@@ -1,20 +1,16 @@
 /**
- * Registers a new login user: generates a TOTP secret, prints a QR code to
- * scan with an authenticator app, and stores the secret (encrypted) in the
- * database. There is no admin UI by design — adding a person means running
- * this script once.
+ * Registers a new username with no TOTP secret yet. There is no admin UI by
+ * design — adding a person means running this script once. The user then
+ * completes their own TOTP setup (scan QR + confirm) the first time they
+ * visit /login — see src/app/api/auth/status/route.ts.
  *
  * Usage:
  *   npx tsx scripts/seed-user.ts <username>
  */
-import "dotenv/config";
-import qrcode from "qrcode";
 import { neon } from "@neondatabase/serverless";
 import { drizzle } from "drizzle-orm/neon-http";
 import { eq } from "drizzle-orm";
 import * as schema from "../src/lib/db/schema";
-import { generateTotpSecret, buildTotpUri } from "../src/lib/auth/totp";
-import { encryptSecret } from "../src/lib/crypto";
 
 async function main() {
   const username = process.argv[2]?.trim();
@@ -25,10 +21,6 @@ async function main() {
 
   if (!process.env.DATABASE_URL) {
     console.error("DATABASE_URL is not set (check .env.local)");
-    process.exit(1);
-  }
-  if (!process.env.TOTP_ENCRYPTION_KEY) {
-    console.error("TOTP_ENCRYPTION_KEY is not set (check .env.local)");
     process.exit(1);
   }
 
@@ -45,19 +37,16 @@ async function main() {
     process.exit(1);
   }
 
-  const secret = generateTotpSecret();
-  const uri = buildTotpUri(secret, username);
-  const encrypted = encryptSecret(secret);
-
   await db.insert(schema.users).values({
     username,
-    totpSecretEncrypted: encrypted,
+    totpSecretEncrypted: null,
   });
 
-  console.log(`\nUser "${username}" created.\n`);
-  console.log("Scan this QR code with Google Authenticator / Authy:\n");
-  console.log(await qrcode.toString(uri, { type: "terminal", small: true }));
-  console.log(`If you can't scan it, enter this secret manually: ${secret}\n`);
+  console.log(
+    `\nUser "${username}" registered. They can now visit /login, enter ` +
+      `"${username}", and complete TOTP setup themselves (a QR code will ` +
+      `be shown automatically since no secret is set yet).\n`
+  );
 }
 
 main()

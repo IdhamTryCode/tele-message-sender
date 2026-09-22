@@ -20,6 +20,9 @@ whitelist target di server, validasi berlapis, dan audit trail penuh.
 
 - **Login tanpa password** — autentikasi berbasis TOTP (Time-based One-Time
   Password), setiap user punya identitas sendiri untuk keperluan audit.
+- **Setup TOTP mandiri lewat web** — admin cukup daftarkan username; user
+  scan QR code dan konfirmasi TOTP sendiri saat login pertama kali, tidak
+  perlu bantuan admin atau akses terminal.
 - **Form laporan terstruktur** — judul, tanggal, deskripsi, mitigasi, dan
   lampiran gambar opsional, dengan validasi di client maupun server.
 - **Target Telegram lewat dropdown** — daftar target (grup/channel) di-resolve
@@ -87,6 +90,9 @@ Lapisan pertahanan utama:
    instance serverless di Vercel tidak berbagi memori antar request.
 6. **TOTP dengan proteksi replay**: setiap time-step yang sudah dipakai
    dicatat per user sehingga kode yang sama tidak bisa dipakai dua kali.
+   Status setup (`totpConfirmedAt`) terpisah dari keberadaan secret — QR
+   baru hanya diterbitkan ulang untuk setup yang belum pernah berhasil
+   dikonfirmasi, tidak pernah untuk akun yang sudah aktif dipakai.
 7. **Session cookie** signed JWT (HS256), `httpOnly` + `secure` +
    `sameSite=strict`.
 8. **Security headers** (`X-Content-Type-Options`, `X-Frame-Options`,
@@ -186,15 +192,19 @@ npm run db:push
 
 ### 6. Tambah user pertama
 
-Tidak ada halaman admin — user didaftarkan lewat script sekali jalan:
+Tidak ada halaman admin — username didaftarkan lewat script sekali jalan
+(tanpa TOTP, itu langkah berikutnya):
 
 ```bash
 npm run seed:user -- <username>
 ```
 
-Script mencetak QR code di terminal. Scan dengan Google Authenticator, Authy,
-atau aplikasi TOTP lain. Tidak ada password — kode 6 digit dari aplikasi
-authenticator adalah satu-satunya kredensial.
+User lalu menyelesaikan setup TOTP-nya sendiri: buka `/login`, masukkan
+username, sistem otomatis menampilkan QR code (karena belum ada TOTP
+terpasang) untuk di-scan dengan Google Authenticator/Authy/aplikasi TOTP
+lain, lalu masukkan kode pertama untuk konfirmasi sekaligus login. Tidak ada
+password — kode 6 digit dari aplikasi authenticator adalah satu-satunya
+kredensial.
 
 ### 7. Jalankan
 
@@ -245,6 +255,14 @@ tanpa memahami konsekuensinya:
 - **Preview/konfirmasi wajib sebelum kirim.** Pesan Telegram tidak bisa
   ditarik setelah dibaca — ini kontrol keamanan untuk mencegah salah
   target/salah isi menjadi insiden tersendiri, bukan sekadar UX.
+- **Setup TOTP tanpa token undangan terpisah.** Siapa pun yang tahu sebuah
+  username terdaftar bisa memicu/mengklaim setup TOTP-nya (dapat QR code)
+  selama setup itu belum pernah berhasil dikonfirmasi — tidak ada mekanisme
+  invite token per user. Untuk skala tim (2 user, nama diketahui bersama)
+  ini dinilai proporsional; jendela risikonya tertutup permanen begitu user
+  berhasil login pertama kali. Kalau tim berkembang lebih besar atau
+  username menjadi mudah ditebak, ini perlu ditinjau ulang (mis. tambah
+  token setup sekali pakai yang dikirim admin secara out-of-band).
 
 > **Catatan untuk tim/atasan:** Telegram bukan medium terenkripsi
 > end-to-end untuk grup — isi pesan tersimpan di server Telegram, di luar

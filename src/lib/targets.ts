@@ -17,7 +17,7 @@ export interface TelegramTarget {
 function buildTargets(): TelegramTarget[] {
   const entries: Array<{ key: string; label: string; envVar: string }> = [
     { key: "soc", label: "Tim SOC", envVar: "TG_CHAT_SOC" },
-    { key: "mgmt", label: "Manajemen", envVar: "TG_CHAT_MGMT" },
+    { key: "test-group", label: "Test Group", envVar: "TG_CHAT_TEST_GROUP" },
   ];
 
   const targets: TelegramTarget[] = [];

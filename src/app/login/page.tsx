@@ -6,22 +6,61 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, Label, FieldError } from "@/components/ui/card";
 
+type Step =
+  | { kind: "username" }
+  | { kind: "setup"; username: string; qrDataUrl: string; manualKey: string }
+  | { kind: "code"; username: string };
+
 export default function LoginPage() {
   const router = useRouter();
+  const [step, setStep] = useState<Step>({ kind: "username" });
   const [username, setUsername] = useState("");
   const [code, setCode] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
-  async function handleSubmit(e: React.FormEvent) {
+  async function handleUsernameSubmit(e: React.FormEvent) {
     e.preventDefault();
+    setError(null);
+    setSubmitting(true);
+    try {
+      const res = await fetch("/api/auth/status", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setError(data.error ?? "Terjadi kesalahan. Coba lagi.");
+        return;
+      }
+      if (data.setupRequired) {
+        setStep({
+          kind: "setup",
+          username,
+          qrDataUrl: data.qrDataUrl,
+          manualKey: data.manualKey,
+        });
+      } else {
+        setStep({ kind: "code", username });
+      }
+    } catch {
+      setError("Terjadi kesalahan jaringan. Coba lagi.");
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  async function handleCodeSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (step.kind === "username") return;
     setError(null);
     setSubmitting(true);
     try {
       const res = await fetch("/api/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username, code }),
+        body: JSON.stringify({ username: step.username, code }),
       });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
@@ -37,50 +76,137 @@ export default function LoginPage() {
     }
   }
 
+  function backToUsername() {
+    setStep({ kind: "username" });
+    setCode("");
+    setError(null);
+  }
+
   return (
     <main className="flex flex-1 items-center justify-center px-4 py-12">
       <Card className="w-full max-w-sm">
-        <h1 className="text-[28px] font-semibold text-ink mb-1">Masuk</h1>
-        <p className="text-[14px] text-ink-muted-48 mb-6">
-          Masukkan username dan kode dari aplikasi authenticator Anda.
-        </p>
+        {step.kind === "username" && (
+          <>
+            <h1 className="text-[28px] font-semibold text-ink mb-1">Masuk</h1>
+            <p className="text-[14px] text-ink-muted-48 mb-6">
+              Masukkan username Anda untuk melanjutkan.
+            </p>
+            <form onSubmit={handleUsernameSubmit} className="space-y-4">
+              <div>
+                <Label htmlFor="username">Username</Label>
+                <Input
+                  id="username"
+                  name="username"
+                  autoComplete="username"
+                  autoFocus
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
+                  required
+                />
+              </div>
+              <FieldError message={error ?? undefined} />
+              <Button type="submit" className="w-full" disabled={submitting}>
+                {submitting ? "Memeriksa..." : "Lanjut"}
+              </Button>
+            </form>
+          </>
+        )}
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <Label htmlFor="username">Username</Label>
-            <Input
-              id="username"
-              name="username"
-              autoComplete="username"
-              autoFocus
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
-              required
-            />
-          </div>
+        {step.kind === "setup" && (
+          <>
+            <h1 className="text-[28px] font-semibold text-ink mb-1">
+              Setup Authenticator
+            </h1>
+            <p className="text-[14px] text-ink-muted-48 mb-4">
+              Scan kode QR ini dengan Google Authenticator, Authy, atau
+              aplikasi TOTP lain, lalu masukkan kode yang muncul untuk
+              menyelesaikan setup.
+            </p>
+            <div className="flex justify-center mb-4">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={step.qrDataUrl}
+                alt="QR code setup authenticator"
+                className="rounded-lg border border-hairline"
+                width={200}
+                height={200}
+              />
+            </div>
+            <p className="text-[12px] text-ink-muted-48 mb-4 break-all">
+              Tidak bisa scan? Masukkan kunci ini secara manual:{" "}
+              <span className="font-mono text-ink-muted-80">
+                {step.manualKey}
+              </span>
+            </p>
+            <form onSubmit={handleCodeSubmit} className="space-y-4">
+              <div>
+                <Label htmlFor="code">Kode Konfirmasi</Label>
+                <Input
+                  id="code"
+                  name="code"
+                  inputMode="numeric"
+                  pattern="\d{6}"
+                  maxLength={6}
+                  autoComplete="one-time-code"
+                  autoFocus
+                  value={code}
+                  onChange={(e) => setCode(e.target.value.replace(/\D/g, ""))}
+                  placeholder="123456"
+                  required
+                />
+              </div>
+              <FieldError message={error ?? undefined} />
+              <Button type="submit" className="w-full" disabled={submitting}>
+                {submitting ? "Memverifikasi..." : "Konfirmasi & Masuk"}
+              </Button>
+              <button
+                type="button"
+                onClick={backToUsername}
+                className="w-full text-center text-[14px] text-ink-muted-48 hover:text-ink hover:underline"
+              >
+                Ganti username
+              </button>
+            </form>
+          </>
+        )}
 
-          <div>
-            <Label htmlFor="code">Kode Authenticator</Label>
-            <Input
-              id="code"
-              name="code"
-              inputMode="numeric"
-              pattern="\d{6}"
-              maxLength={6}
-              autoComplete="one-time-code"
-              value={code}
-              onChange={(e) => setCode(e.target.value.replace(/\D/g, ""))}
-              placeholder="123456"
-              required
-            />
-          </div>
-
-          <FieldError message={error ?? undefined} />
-
-          <Button type="submit" className="w-full" disabled={submitting}>
-            {submitting ? "Memverifikasi..." : "Masuk"}
-          </Button>
-        </form>
+        {step.kind === "code" && (
+          <>
+            <h1 className="text-[28px] font-semibold text-ink mb-1">Masuk</h1>
+            <p className="text-[14px] text-ink-muted-48 mb-6">
+              Masukkan kode dari aplikasi authenticator Anda.
+            </p>
+            <form onSubmit={handleCodeSubmit} className="space-y-4">
+              <div>
+                <Label htmlFor="code">Kode Authenticator</Label>
+                <Input
+                  id="code"
+                  name="code"
+                  inputMode="numeric"
+                  pattern="\d{6}"
+                  maxLength={6}
+                  autoComplete="one-time-code"
+                  autoFocus
+                  value={code}
+                  onChange={(e) => setCode(e.target.value.replace(/\D/g, ""))}
+                  placeholder="123456"
+                  required
+                />
+              </div>
+              <FieldError message={error ?? undefined} />
+              <Button type="submit" className="w-full" disabled={submitting}>
+                {submitting ? "Memverifikasi..." : "Masuk"}
+              </Button>
+              <button
+                type="button"
+                onClick={backToUsername}
+                className="w-full text-center text-[14px] text-ink-muted-48 hover:text-ink hover:underline"
+              >
+                Ganti username
+              </button>
+            </form>
+          </>
+        )}
       </Card>
     </main>
   );
