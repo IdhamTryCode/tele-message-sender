@@ -14,12 +14,12 @@ function makeTotp(secret?: string) {
   return new TOTP({ secret, issuer: ISSUER, crypto, base32 });
 }
 
-/** Used by /api/auth/status when a user's TOTP hasn't been set up yet. */
+/** Used by /api/auth/activate when a user's TOTP hasn't been set up yet. */
 export function generateTotpSecret(): string {
   return makeTotp().generateSecret();
 }
 
-/** Used by /api/auth/status to build the QR-code setup URI. */
+/** Used by /api/auth/activate to build the QR-code setup URI. */
 export function buildTotpUri(secret: string, username: string): string {
   return makeTotp(secret).toURI({ label: username, issuer: ISSUER });
 }
