@@ -18,6 +18,9 @@ function buildTargets(): TelegramTarget[] {
   const entries: Array<{ key: string; label: string; envVar: string }> = [
     { key: "soc", label: "Tim SOC", envVar: "TG_CHAT_SOC" },
     { key: "test-group", label: "Test Group", envVar: "TG_CHAT_TEST_GROUP" },
+    { key: "blue-team", label: "Tim Blue Team", envVar: "TG_CHAT_BLUE_TEAM" },
+    { key: "pribadi", label: "Pribadi (Telegram DM)", envVar: "TG_CHAT_PRIBADI" },
+    { key: "pribadi", label: "DM Idham", envVar: "TG_CHAT_PRIBADI" },
   ];
 
   const targets: TelegramTarget[] = [];
