@@ -1,5 +1,7 @@
 import type { NextConfig } from "next";
 
+const isDev = process.env.NODE_ENV === "development";
+
 const nextConfig: NextConfig = {
   async headers() {
     return [
@@ -20,7 +22,11 @@ const nextConfig: NextConfig = {
               // dynamic rendering — not worth the tradeoff for an app with
               // no user-controlled HTML/script injection surface (all
               // inputs are rendered as plain text, never dangerouslySet).
-              "script-src 'self' 'unsafe-inline'",
+              // 'unsafe-eval' is added only in dev: React's dev mode uses
+              // eval() to reconstruct server-side error stacks in the
+              // browser. Neither React nor Next.js use eval() in
+              // production, so this never applies to what Vercel serves.
+              `script-src 'self' 'unsafe-inline'${isDev ? " 'unsafe-eval'" : ""}`,
               "style-src 'self' 'unsafe-inline' fonts.googleapis.com",
               "font-src 'self' fonts.gstatic.com",
               "img-src 'self' data:",
