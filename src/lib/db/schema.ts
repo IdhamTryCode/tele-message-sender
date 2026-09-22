@@ -44,6 +44,10 @@ export const reports = pgTable("reports", {
   // this is one audit row per submission, not per target (see status below
   // for how partial multi-target failures are represented).
   targetKeys: text("target_keys").notNull(),
+  // JSON object mapping failed target keys to a translated (never raw
+  // Telegram) error message, e.g. '{"test-group":"Bot tidak terdaftar di
+  // chat ini."}'. Null when status is "sent" (nothing failed).
+  targetErrors: text("target_errors"),
   // Username from the session, not from client-supplied body — set by the
   // route handler, never trusted from request input.
   submittedBy: varchar("submitted_by", { length: 50 }).notNull(),

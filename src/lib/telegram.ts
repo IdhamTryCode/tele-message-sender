@@ -24,11 +24,46 @@ function getBotToken(): string {
 export class TelegramSendError extends Error {
   constructor(
     message: string,
-    public readonly statusCode?: number
+    public readonly statusCode?: number,
+    /**
+     * Indonesian, user-safe explanation of what likely went wrong — always
+     * from a fixed set of known categories, never the raw Telegram
+     * `description` (which we haven't audited for what it might contain).
+     */
+    public readonly translatedMessage: string = "Terjadi kesalahan saat mengirim ke Telegram."
   ) {
     super(message);
     this.name = "TelegramSendError";
   }
+}
+
+/**
+ * Maps the handful of Telegram `description` substrings this app is
+ * actually likely to see to a plain-Indonesian explanation. Deliberately a
+ * substring allowlist, not a passthrough — an unrecognized description
+ * falls back to a generic message rather than being shown verbatim, since
+ * we can't guarantee every possible Telegram error string is safe to
+ * surface as-is.
+ */
+function translateTelegramError(description: string): string {
+  const lower = description.toLowerCase();
+  if (lower.includes("chat not found")) {
+    return "Bot tidak terdaftar di chat ini, atau chat ID tidak valid.";
+  }
+  if (
+    lower.includes("bot was blocked") ||
+    lower.includes("kicked") ||
+    lower.includes("bot was kicked")
+  ) {
+    return "Bot telah dikeluarkan atau diblokir dari chat ini.";
+  }
+  if (lower.includes("not enough rights")) {
+    return "Bot tidak memiliki izin untuk mengirim pesan di chat ini.";
+  }
+  if (lower.includes("too many requests") || lower.includes("retry after")) {
+    return "Telegram membatasi laju pengiriman sementara. Coba lagi sebentar.";
+  }
+  return "Terjadi kesalahan saat mengirim ke Telegram.";
 }
 
 async function callTelegramApi(
@@ -43,12 +78,21 @@ async function callTelegramApi(
 
   if (!res.ok) {
     // Don't leak Telegram's raw response body to callers/clients — log it
-    // server-side only, and surface a generic error upstream.
+    // server-side only, and surface a translated (never raw) error upstream.
     const text = await res.text().catch(() => "");
     console.error(`Telegram API ${method} failed (${res.status}): ${text}`);
+
+    let description = "";
+    try {
+      description = JSON.parse(text)?.description ?? "";
+    } catch {
+      // Non-JSON body (unlikely from Telegram, but don't crash on it).
+    }
+
     throw new TelegramSendError(
       `Telegram API request failed (${method})`,
-      res.status
+      res.status,
+      translateTelegramError(description)
     );
   }
 }

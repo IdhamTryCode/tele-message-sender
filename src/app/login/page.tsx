@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Spinner } from "@/components/ui/spinner";
@@ -102,7 +103,15 @@ export default function LoginPage() {
   }
 
   return (
-    <main className="flex flex-1 items-center justify-center px-4 py-12">
+    <main className="flex flex-1 flex-col items-center justify-center px-4 py-12">
+      <Image
+        src="/bankjateng.png"
+        alt="Bank Jateng"
+        width={200}
+        height={92}
+        className="mb-6 h-11 w-auto"
+        priority
+      />
       <Card className="w-full max-w-sm">
         {step.kind === "username" && (
           <>

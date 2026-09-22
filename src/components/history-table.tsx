@@ -27,6 +27,16 @@ function parseTargetKeys(raw: string): string[] {
   }
 }
 
+function parseTargetErrors(raw: string | null): Record<string, string> {
+  if (!raw) return {};
+  try {
+    const parsed = JSON.parse(raw);
+    return typeof parsed === "object" && parsed !== null ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+
 export function HistoryTable({
   reports,
   targetLabels,
@@ -73,10 +83,12 @@ export function HistoryTable({
           {reports.map((r) => {
             const keys = parseTargetKeys(r.targetKeys);
             const labels = keys.map((k) => targetLabels[k] ?? k).join(", ");
+            const errors = parseTargetErrors(r.targetErrors);
+            const errorEntries = Object.entries(errors);
             return (
               <tr
                 key={r.id}
-                className="border-b border-hairline last:border-0"
+                className="border-b border-hairline last:border-0 align-top"
               >
                 <td className="px-4 py-3 text-ink">{r.judul}</td>
                 <td className="px-4 py-3 text-ink-muted-80">{r.tanggal}</td>
@@ -85,6 +97,21 @@ export function HistoryTable({
                   <span className={STATUS_CLASS[r.status] ?? "text-ink"}>
                     {STATUS_LABEL[r.status] ?? r.status}
                   </span>
+                  {errorEntries.length > 0 && (
+                    <ul className="mt-1 space-y-0.5">
+                      {errorEntries.map(([key, msg]) => (
+                        <li
+                          key={key}
+                          className="text-[12px] text-ink-muted-48"
+                        >
+                          <span className="font-medium">
+                            {targetLabels[key] ?? key}:
+                          </span>{" "}
+                          {msg}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
                 </td>
                 <td className="px-4 py-3 text-ink-muted-48">
                   {new Date(r.createdAt).toLocaleString("id-ID")}

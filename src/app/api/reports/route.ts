@@ -3,7 +3,7 @@ import { desc, eq } from "drizzle-orm";
 import { getSession } from "@/lib/auth/session";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { reportSchema } from "@/lib/validation/report";
-import { resolveTargetChatId } from "@/lib/targets";
+import { resolveTargetChatId, getPublicTargets } from "@/lib/targets";
 import { validateAndSanitizeImage, InvalidImageError } from "@/lib/image";
 import {
   buildReportMessage,
@@ -124,7 +124,13 @@ export const POST = withErrorHandling(async (request: Request) => {
   // behavior predictable and per-target error attribution simple at this
   // scale (2 targets today).
   let successCount = 0;
-  for (const chatId of chatIds) {
+  const targetErrors: Record<string, string> = {};
+  const targetsWithChatIds = targetKeys.map((key, i) => ({
+    key,
+    chatId: chatIds[i],
+  }));
+
+  for (const { key, chatId } of targetsWithChatIds) {
     try {
       if (sanitizedImage) {
         if (fitsAsCaption(message)) {
@@ -154,6 +160,7 @@ export const POST = withErrorHandling(async (request: Request) => {
       if (err instanceof TelegramSendError) {
         // Continue to the remaining targets — one failing shouldn't stop
         // delivery to the others.
+        targetErrors[key] = err.translatedMessage;
         continue;
       }
       throw err;
@@ -174,22 +181,36 @@ export const POST = withErrorHandling(async (request: Request) => {
     mitigasi,
     hasImage: sanitizedImage !== null,
     targetKeys: JSON.stringify(targetKeys),
+    targetErrors: Object.keys(targetErrors).length
+      ? JSON.stringify(targetErrors)
+      : null,
     submittedBy: session.username,
     status,
   });
 
   if (status === "failed") {
+    const detail = Object.values(targetErrors)[0];
     return NextResponse.json(
-      { error: "Gagal mengirim ke Telegram. Silakan coba lagi." },
+      {
+        error: detail
+          ? `Gagal mengirim ke Telegram: ${detail}`
+          : "Gagal mengirim ke Telegram. Silakan coba lagi.",
+      },
       { status: 502 }
     );
   }
 
   if (status === "partial") {
+    const targetLabels = Object.fromEntries(
+      getPublicTargets().map((t) => [t.key, t.label])
+    );
+    const detailLines = Object.entries(targetErrors).map(
+      ([key, msg]) => `${targetLabels[key] ?? key}: ${msg}`
+    );
     return NextResponse.json({
       ok: true,
       partial: true,
-      message: `Terkirim ke ${successCount} dari ${chatIds.length} target. Cek riwayat untuk detail.`,
+      message: `Terkirim ke ${successCount} dari ${chatIds.length} target.\n${detailLines.join("\n")}`,
     });
   }
 

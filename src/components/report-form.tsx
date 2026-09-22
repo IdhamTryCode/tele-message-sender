@@ -144,6 +144,10 @@ export function ReportForm() {
         ? data.message
         : "Laporan berhasil dikirim.";
       sessionStorage.setItem("reportSubmitNotice", notice);
+      sessionStorage.setItem(
+        "reportSubmitNoticeVariant",
+        data.partial ? "info" : "success"
+      );
       router.push("/history");
       router.refresh();
     } catch {

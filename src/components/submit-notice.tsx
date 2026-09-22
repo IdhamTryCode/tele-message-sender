@@ -4,13 +4,17 @@ import { useState } from "react";
 import { Banner } from "@/components/ui/banner";
 
 const NOTICE_KEY = "reportSubmitNotice";
+const VARIANT_KEY = "reportSubmitNoticeVariant";
 
-function readAndClearNotice(): string | null {
+function readAndClearNotice(): { text: string; variant: "success" | "info" } | null {
   if (typeof window === "undefined") return null;
   try {
     const stored = sessionStorage.getItem(NOTICE_KEY);
-    if (stored) sessionStorage.removeItem(NOTICE_KEY);
-    return stored;
+    const variant = sessionStorage.getItem(VARIANT_KEY);
+    sessionStorage.removeItem(NOTICE_KEY);
+    sessionStorage.removeItem(VARIANT_KEY);
+    if (!stored) return null;
+    return { text: stored, variant: variant === "info" ? "info" : "success" };
   } catch {
     // sessionStorage unavailable (private browsing, etc.) — skip the
     // notice, not critical.
@@ -30,14 +34,13 @@ function readAndClearNotice(): string | null {
  * external system" pattern — it's a plain one-time read on mount.
  */
 export function SubmitNotice() {
-  const [notice] = useState<string | null>(readAndClearNotice);
+  const [notice] = useState(readAndClearNotice);
 
   if (!notice) return null;
 
-  const isPartial = notice.toLowerCase().includes("sebagian");
   return (
-    <Banner variant={isPartial ? "info" : "success"} className="mb-4">
-      {notice}
+    <Banner variant={notice.variant} className="mb-4 whitespace-pre-line">
+      {notice.text}
     </Banner>
   );
 }
