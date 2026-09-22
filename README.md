@@ -255,14 +255,57 @@ tanpa memahami konsekuensinya:
 - **Preview/konfirmasi wajib sebelum kirim.** Pesan Telegram tidak bisa
   ditarik setelah dibaca — ini kontrol keamanan untuk mencegah salah
   target/salah isi menjadi insiden tersendiri, bukan sekadar UX.
-- **Setup TOTP tanpa token undangan terpisah.** Siapa pun yang tahu sebuah
-  username terdaftar bisa memicu/mengklaim setup TOTP-nya (dapat QR code)
-  selama setup itu belum pernah berhasil dikonfirmasi — tidak ada mekanisme
-  invite token per user. Untuk skala tim (2 user, nama diketahui bersama)
-  ini dinilai proporsional; jendela risikonya tertutup permanen begitu user
-  berhasil login pertama kali. Kalau tim berkembang lebih besar atau
-  username menjadi mudah ditebak, ini perlu ditinjau ulang (mis. tambah
-  token setup sekali pakai yang dikirim admin secara out-of-band).
+- **[RISIKO DITERIMA — SEDANG] Setup TOTP tanpa token undangan terpisah.**
+  Siapa pun yang tahu sebuah username terdaftar bisa memicu/mengklaim setup
+  TOTP-nya (dapat QR code) selama setup itu belum pernah berhasil
+  dikonfirmasi (`totpConfirmedAt IS NULL`) — tidak ada mekanisme invite
+  token per user. Ini pola "unclaimed account takeover" yang sudah
+  diidentifikasi lewat review (internal), bukan celah yang belum disadari.
+  **Kenapa diterima untuk sekarang:** jumlah user kecil dan diketahui
+  pribadi oleh admin (tidak ada self-signup publik, tidak ada daftar
+  username yang dipublikasikan); jendela risiko tertutup permanen per-user
+  begitu mereka berhasil login pertama kali; admin bisa memverifikasi
+  status setup lewat query `SELECT username, totp_confirmed_at FROM users`
+  kapan saja.
+  **Mitigasi operasional saat ini (tanpa ubah kode):** setelah
+  `seed:user`, admin memberi tahu user untuk **segera** menyelesaikan setup
+  (bukan menunda), dan admin memeriksa berkala apakah ada user yang lama
+  `totpConfirmedAt IS NULL` — itu jendela terbuka yang idealnya secepatnya
+  ditutup.
+  **Kapan wajib direvisit:** (a) jumlah user melewati skala "semua saling
+  kenal langsung" (kira-kira >5-10 user atau lintas divisi), (b) username
+  jadi predictable/terpublikasi (mis. pola `nama.divisi`), atau (c) ada
+  insiden nyata yang memanfaatkan celah ini. Perbaikannya: token setup
+  sekali pakai yang digenerate admin dan dikirim out-of-band, diminta
+  bersama username saat setup pertama — desainnya sudah dipetakan, tinggal
+  diimplementasikan saat salah satu kondisi di atas terpenuhi.
+- **[RISIKO DITERIMA — RENDAH] CSP `script-src` memakai `'unsafe-inline'`.**
+  Next.js App Router menyuntikkan inline script untuk data hydration RSC
+  di setiap halaman, termasuk yang di-prerender statis (`/login` adalah
+  static route — cek `next build` output) — tanpa `'unsafe-inline'`,
+  React gagal hydrate total dan halaman jadi tidak interaktif sama sekali
+  (pernah terjadi persis begini di sesi pengembangan awal). Alternatif
+  yang lebih ketat, CSP berbasis nonce, mengharuskan **semua** halaman
+  dirender secara dinamis (kehilangan static optimization) — untuk
+  `/login`, yang paling sering diakses (tiap percobaan login), ini
+  trade-off performa nyata, bukan cuma teori. **Mitigasi yang menggantikan
+  proteksi CSP ini:** tidak ada satu pun `dangerouslySetInnerHTML` di
+  codebase; seluruh input user (judul, deskripsi, mitigasi, dll) dirender
+  sebagai plain text lewat JSX (auto-escaped React), tidak pernah
+  diinterpolasi ke markup mentah — ini yang jadi lapisan utama proteksi
+  XSS, CSP hanya lapisan tambahan (defense in depth), bukan satu-satunya
+  garis pertahanan. **Kapan wajib direvisit:** kalau ada fitur baru yang
+  butuh render HTML dari input user (rich text, dll) — di titik itu nonce
+  atau sanitisasi HTML eksplisit (mis. DOMPurify) wajib dipertimbangkan.
+
+- **[RISIKO DITERIMA — RENDAH] Kunci manual TOTP ditampilkan sebagai teks
+  di layar setup.** Untuk user yang tidak bisa scan QR, secret TOTP mentah
+  (`manualKey`) ditampilkan apa adanya sebagai fallback — pola standar di
+  hampir semua aplikasi authenticator (Google Authenticator, Authy, dll
+  semua punya fallback serupa). Risikonya terbatas pada device/jaringan
+  lokal user saat momen setup itu saja (shoulder-surfing, shared device);
+  tidak tersimpan di log atau tempat lain setelah request selesai. Cukup
+  diterima selama asumsi "user pakai device pribadi saat setup" berlaku.
 
 > **Catatan untuk tim/atasan:** Telegram bukan medium terenkripsi
 > end-to-end untuk grup — isi pesan tersimpan di server Telegram, di luar
