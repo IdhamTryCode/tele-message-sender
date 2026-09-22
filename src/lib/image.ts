@@ -4,6 +4,16 @@ import { ALLOWED_IMAGE_MIME_TYPES, MAX_IMAGE_BYTES } from "@/lib/validation/repo
 
 export class InvalidImageError extends Error {}
 
+// Telegram's sendPhoto rejects images whose width+height exceeds 10000px
+// or whose aspect ratio exceeds 20:1 (PHOTO_INVALID_DIMENSIONS) — this hit
+// in practice with a real upload. Checking metadata before the full
+// re-encode also caps how large a pixel buffer sharp will decode into
+// memory, which a small but pixel-dense file (e.g. a 40000x40000 PNG)
+// could otherwise blow up to gigabytes of uncompressed bitmap and crash
+// the serverless function.
+const MAX_DIMENSION = 6000;
+const MAX_ASPECT_RATIO = 20;
+
 /**
  * Validates an uploaded image and strips EXIF metadata before it ever
  * leaves the server. Two things matter here beyond the obvious size check:
@@ -37,6 +47,26 @@ export async function validateAndSanitizeImage(
   ) {
     throw new InvalidImageError(
       "File is not a valid JPEG, PNG, or WebP image"
+    );
+  }
+
+  // Reading metadata alone (not a full decode) is cheap even for a
+  // maliciously crafted file — this is what keeps the pixel-bomb check
+  // ahead of the expensive full re-encode below.
+  const metadata = await sharp(buffer).metadata();
+  const { width, height } = metadata;
+  if (!width || !height) {
+    throw new InvalidImageError("Could not read image dimensions");
+  }
+  if (width > MAX_DIMENSION || height > MAX_DIMENSION) {
+    throw new InvalidImageError(
+      `Image dimensions exceed maximum of ${MAX_DIMENSION}x${MAX_DIMENSION}px`
+    );
+  }
+  const aspectRatio = Math.max(width, height) / Math.min(width, height);
+  if (aspectRatio > MAX_ASPECT_RATIO) {
+    throw new InvalidImageError(
+      `Image aspect ratio exceeds maximum of ${MAX_ASPECT_RATIO}:1`
     );
   }
 
