@@ -14,8 +14,19 @@ const activateSchema = z.object({
   code: z.string().trim().min(1).max(12),
 });
 
+// Deliberately the same message for every failure case (unknown username,
+// wrong code, already-consumed code, expired code) — distinguishing them
+// would leak which usernames are registered and/or which activation codes
+// were once valid. "Sudah pernah dipakai" is mentioned because it's a
+// genuinely common, non-adversarial path: a user who saw the QR but
+// didn't finish scanning before navigating away lands here on retry, and
+// the fix (ask the admin for a new code) is the same regardless of which
+// underlying reason applies.
 const GENERIC_ERROR = NextResponse.json(
-  { error: "Username atau kode aktivasi tidak valid" },
+  {
+    error:
+      "Username atau kode aktivasi tidak valid, sudah pernah dipakai, atau kedaluwarsa. Hubungi admin untuk kode aktivasi baru.",
+  },
   { status: 401 }
 );
 
