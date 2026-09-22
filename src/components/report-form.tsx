@@ -35,6 +35,15 @@ function readSkipPreview(): boolean {
 
 export function ReportForm() {
   const router = useRouter();
+  // Recomputed each render (cheap) rather than memoized/module-level —
+  // module-level would fix "today" at first module load, risking a stale
+  // value across a long-lived session and a server/client mismatch during
+  // hydration. This only feeds the date picker's UI-level `max` (a
+  // convenience, not the security boundary — see maxAllowedDate() in
+  // lib/validation/report.ts for the actual server-enforced check), so
+  // using the browser's local date here (not UTC) is intentional: the
+  // calendar should visually cap at "today" the way the user perceives it.
+  const todayLocal = new Date().toLocaleDateString("en-CA");
   const [targets, setTargets] = useState<Target[]>([]);
   const [targetsLoading, setTargetsLoading] = useState(true);
   const [imageFile, setImageFile] = useState<File | null>(null);
@@ -186,7 +195,12 @@ export function ReportForm() {
             <Label htmlFor="tanggal">
               Tanggal <span className="text-danger">*</span>
             </Label>
-            <Input id="tanggal" type="date" {...register("tanggal")} />
+            <Input
+              id="tanggal"
+              type="date"
+              max={todayLocal}
+              {...register("tanggal")}
+            />
             <FieldError message={errors.tanggal?.message} />
           </div>
 
