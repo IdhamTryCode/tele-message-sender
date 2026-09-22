@@ -300,6 +300,24 @@ tanpa memahami konsekuensinya:
   "aktif/tidak" dinilai berisiko (mis. dipakai untuk social engineering
   bertarget) — perbaikannya cukup mengganti pesan ini jadi generik juga,
   tanpa perubahan arsitektur.
+- **[RISIKO DITERIMA — RENDAH] Kode aktivasi disampaikan lewat kanal
+  manusia (WA/lisan), bukan sistem otomatis.** Ini titik lemah manusia,
+  bukan teknis (diangkat lewat red-team exercise internal): kalau akun
+  WhatsApp admin yang mengirim kode itu ter-compromise, atau kode
+  ter-intersep saat disampaikan lisan, penyerang dapat kode aktivasi yang
+  sama validnya dengan yang diterima user asli. **Kenapa diterima:** tidak
+  ada infrastruktur email/SMS resmi yang bisa diaudit untuk aplikasi
+  internal skala ini — menambahkannya cuma memindahkan titik lemah yang
+  sama ke sistem lain (email admin ter-compromise = celah yang sama).
+  Kode tetap satu kali pakai dan kedaluwarsa 48 jam, jadi jendela
+  eksposur kalau kanal WA/lisan itu bocor tetap terbatas waktu, tidak
+  permanen. **Mitigasi operasional:** admin memverifikasi identitas
+  penerima sebelum mengirim kode (bukan broadcast ke grup), dan idealnya
+  username & kode disampaikan lewat dua pesan/momen terpisah, bukan
+  digabung jadi satu. **Kapan wajib direvisit:** kalau organisasi
+  menyediakan SSO/identity provider resmi — di titik itu migrasi ke SSO
+  jadi prioritas yang menghilangkan seluruh kelas risiko ini, bukan cuma
+  activation code.
 - **[RISIKO DITERIMA — RENDAH] CSP `script-src` memakai `'unsafe-inline'`.**
   Next.js App Router menyuntikkan inline script untuk data hydration RSC
   di setiap halaman, termasuk yang di-prerender statis (`/login` adalah
@@ -347,6 +365,16 @@ tanpa memahami konsekuensinya:
 - Tidak ada halaman admin untuk manajemen user — sesuai skala tim kecil
   yang ditarget. Menambah/menghapus user dilakukan lewat script atau query
   database langsung.
+- Request ke path dengan encoded slash (mis. `/form%2f`) menghasilkan HTTP
+  500 di production (Vercel), tapi 404 yang benar saat dijalankan lokal
+  (`next start`) — diverifikasi lewat reproduksi langsung, bukan dugaan.
+  Ini karakteristik layer Edge/CDN Vercel dalam menangani path yang belum
+  ter-decode sebelum request mencapai runtime Next.js, di luar kendali
+  kode aplikasi (bukan bug di `proxy.ts` atau route manapun — keduanya
+  terbukti tidak pernah menerima request ini). Respons 500 itu generic
+  Next.js error page, tidak ada stack trace atau info internal yang bocor
+  — ditemukan lewat red-team exercise internal, dinilai info-only/kosmetik,
+  tidak ada perbaikan yang bisa dilakukan dari sisi kode aplikasi ini.
 
 ## Lisensi
 
