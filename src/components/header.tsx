@@ -23,14 +23,18 @@ export function Header({ username, active }: HeaderProps) {
     <header className="w-full border-b-2 border-accent-gold bg-primary">
       <div className="mx-auto flex max-w-4xl flex-wrap items-center justify-between gap-3 px-4 py-3">
         <div className="flex items-center gap-3">
-          <Image
-            src="/bankjateng.png"
-            alt="Bank Jateng"
-            width={140}
-            height={64}
-            className="h-8 w-auto"
-            priority
-          />
+          {/* The logo's wordmark is navy — needs a light backing on the
+              navy header, or it disappears into the background. */}
+          <div className="rounded-lg bg-white px-2.5 py-1">
+            <Image
+              src="/bankjateng.png"
+              alt="Bank Jateng"
+              width={140}
+              height={64}
+              className="h-6 w-auto"
+              priority
+            />
+          </div>
           <span className="hidden text-[14px] font-semibold text-white/90 sm:inline">
             Tele Message Sender
           </span>
