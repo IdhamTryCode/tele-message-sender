@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 export function LogoutButton({
-  className = "text-ink-muted-48 hover:text-ink",
+  className = "text-[14px] text-ink-muted-48 hover:text-ink hover:underline",
 }: {
   className?: string;
 }) {
@@ -22,10 +22,7 @@ export function LogoutButton({
     <button
       onClick={handleLogout}
       disabled={loading}
-      className={[
-        "text-[14px] hover:underline disabled:opacity-50",
-        className,
-      ].join(" ")}
+      className={["disabled:opacity-50", className].join(" ")}
     >
       {loading ? "Keluar..." : "Keluar"}
     </button>

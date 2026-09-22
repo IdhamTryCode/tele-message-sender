@@ -30,6 +30,10 @@ export default async function HistoryPage() {
       <main className="flex flex-1 flex-col items-center px-4 py-12">
         <div className="w-full max-w-3xl mb-6">
           <h1 className="text-[28px] font-semibold text-ink">Riwayat Saya</h1>
+          <p className="mt-1 text-[14px] text-ink-muted-48">
+            Daftar laporan yang pernah Anda kirim, lengkap dengan status dan
+            target pengirimannya.
+          </p>
         </div>
         <div className="w-full max-w-3xl">
           <SubmitNotice />

@@ -173,10 +173,6 @@ export function ReportForm() {
   return (
     <>
       <Card className="w-full max-w-2xl">
-        <h1 className="text-[28px] font-semibold text-ink mb-6">
-          Laporan Baru
-        </h1>
-
         <form onSubmit={onOpenPreview} method="post" className="space-y-5">
           <div>
             <Label htmlFor="judul">
