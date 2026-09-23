@@ -4,23 +4,35 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { reportSchema, type ReportInput, MAX_IMAGE_BYTES } from "@/lib/validation/report";
+import { ImagePlus, Send, X } from "lucide-react";
+import {
+  reportSchema,
+  type ReportInput,
+  MAX_IMAGE_BYTES,
+} from "@/lib/validation/report";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Checkbox } from "@/components/ui/checkbox";
+import { Checkbox, TargetCard } from "@/components/ui/checkbox";
 import { Spinner } from "@/components/ui/spinner";
 import { Card, Label, FieldError } from "@/components/ui/card";
 import { ReportPreviewDialog } from "@/components/report-preview-dialog";
+import { TelegramPreview } from "@/components/telegram-preview";
 
 interface Target {
   key: string;
   label: string;
+  kind: "group" | "dm";
 }
 
 const SKIP_PREVIEW_KEY = "skipReportPreview";
 const DESKRIPSI_MAX = 1850;
 const MITIGASI_MAX = 1850;
+
+const KIND_LABEL: Record<Target["kind"], string> = {
+  group: "Grup Telegram",
+  dm: "Pesan langsung",
+};
 
 function readSkipPreview(): boolean {
   if (typeof window === "undefined") return false;
@@ -33,7 +45,7 @@ function readSkipPreview(): boolean {
   }
 }
 
-export function ReportForm() {
+export function ReportForm({ username }: { username: string }) {
   const router = useRouter();
   // Recomputed each render (cheap) rather than memoized/module-level —
   // module-level would fix "today" at first module load, risking a stale
@@ -61,6 +73,7 @@ export function ReportForm() {
     register,
     handleSubmit,
     getValues,
+    setValue,
     control,
     formState: { errors },
   } = useForm<ReportInput>({
@@ -71,10 +84,11 @@ export function ReportForm() {
   // useWatch (not the watch() method) — plays nicer with React Compiler's
   // memoization, since watch() returns a new function reference each
   // render that the compiler can't safely memoize around.
-  const deskripsiValue = useWatch({ control, name: "deskripsi" });
-  const mitigasiValue = useWatch({ control, name: "mitigasi" });
-  const deskripsiLength = deskripsiValue?.length ?? 0;
-  const mitigasiLength = mitigasiValue?.length ?? 0;
+  const judulValue = useWatch({ control, name: "judul" }) ?? "";
+  const tanggalValue = useWatch({ control, name: "tanggal" }) ?? "";
+  const deskripsiValue = useWatch({ control, name: "deskripsi" }) ?? "";
+  const mitigasiValue = useWatch({ control, name: "mitigasi" }) ?? "";
+  const selectedKeys = useWatch({ control, name: "targetKeys" }) ?? [];
 
   useEffect(() => {
     fetch("/api/reports/targets")
@@ -134,6 +148,12 @@ export function ReportForm() {
     }
   }
 
+  function clearImage() {
+    setImageFile(null);
+    setImageError(null);
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  }
+
   // Lets a staff member paste a screenshot straight from the clipboard
   // (e.g. after Win+Shift+S) instead of having to save it to a file and
   // then browse for it — meaningful time saved during an active incident.
@@ -148,6 +168,15 @@ export function ReportForm() {
     if (!file) return;
     e.preventDefault();
     applyImageFile(file);
+  }
+
+  const allSelected =
+    targets.length > 0 && selectedKeys.length === targets.length;
+
+  function toggleAll() {
+    setValue("targetKeys", allSelected ? [] : targets.map((t) => t.key), {
+      shouldValidate: true,
+    });
   }
 
   async function doSubmit() {
@@ -179,9 +208,7 @@ export function ReportForm() {
       // Partial success (some targets failed) still counts as a completed
       // submission, but the user needs to know not everything went
       // through — carry the notice across to the history page.
-      const notice = data.partial
-        ? data.message
-        : "Laporan berhasil dikirim.";
+      const notice = data.partial ? data.message : "Laporan berhasil dikirim.";
       sessionStorage.setItem("reportSubmitNotice", notice);
       sessionStorage.setItem(
         "reportSubmitNoticeVariant",
@@ -206,143 +233,205 @@ export function ReportForm() {
   });
 
   const selectedTargetLabels = targets
-    .filter((t) => getValues("targetKeys")?.includes(t.key))
+    .filter((t) => selectedKeys.includes(t.key))
     .map((t) => t.label);
 
   return (
     <>
-      <Card className="w-full max-w-2xl" onPaste={handlePaste}>
-        <form onSubmit={onOpenPreview} method="post" className="space-y-5">
-          <div>
-            <Label htmlFor="judul">
-              Judul <span className="text-danger">*</span>
-            </Label>
-            <Input id="judul" {...register("judul")} />
-            <FieldError message={errors.judul?.message} />
-          </div>
-
-          <div>
-            <Label htmlFor="tanggal">
-              Tanggal <span className="text-danger">*</span>
-            </Label>
-            <Input
-              id="tanggal"
-              type="date"
-              max={todayLocal}
-              {...register("tanggal")}
-            />
-            <FieldError message={errors.tanggal?.message} />
-          </div>
-
-          <div>
-            <Label>
-              Target <span className="text-danger">*</span>
-            </Label>
-            {targetsLoading ? (
-              <p className="text-[14px] text-ink-muted-48">Memuat target...</p>
-            ) : targets.length === 0 ? (
-              <p className="text-[14px] text-danger">
-                Tidak ada target tersedia. Hubungi admin.
-              </p>
-            ) : (
-              <div className="space-y-0.5">
-                {targets.map((t) => (
-                  <Checkbox
-                    key={t.key}
-                    id={`target-${t.key}`}
-                    label={t.label}
-                    value={t.key}
-                    {...register("targetKeys")}
-                  />
-                ))}
+      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px] lg:items-start">
+        <Card className="p-5 sm:p-6" onPaste={handlePaste}>
+          <form onSubmit={onOpenPreview} method="post" className="space-y-5">
+            <div className="grid gap-5 sm:grid-cols-2">
+              <div>
+                <Label htmlFor="judul">
+                  Judul <span className="text-danger">*</span>
+                </Label>
+                <Input
+                  id="judul"
+                  placeholder="Ringkasan singkat laporan"
+                  {...register("judul")}
+                />
+                <FieldError message={errors.judul?.message} />
               </div>
-            )}
-            <FieldError message={errors.targetKeys?.message} />
-          </div>
 
-          <div>
-            <div className="flex items-baseline justify-between">
-              <Label htmlFor="deskripsi">
-                Deskripsi <span className="text-danger">*</span>
-              </Label>
-              <span className="text-[12px] text-ink-muted-48">
-                {deskripsiLength}/{DESKRIPSI_MAX}
-              </span>
+              <div>
+                <Label htmlFor="tanggal">
+                  Tanggal <span className="text-danger">*</span>
+                </Label>
+                <Input
+                  id="tanggal"
+                  type="date"
+                  max={todayLocal}
+                  {...register("tanggal")}
+                />
+                <FieldError message={errors.tanggal?.message} />
+              </div>
             </div>
-            <Textarea
-              id="deskripsi"
-              maxLength={DESKRIPSI_MAX}
-              {...register("deskripsi")}
-            />
-            <FieldError message={errors.deskripsi?.message} />
-          </div>
 
-          <div>
-            <div className="flex items-baseline justify-between">
-              <Label htmlFor="mitigasi">
-                Mitigasi <span className="text-danger">*</span>
-              </Label>
-              <span className="text-[12px] text-ink-muted-48">
-                {mitigasiLength}/{MITIGASI_MAX}
-              </span>
+            <div>
+              <div className="mb-1.5 flex items-baseline justify-between">
+                <Label className="mb-0">
+                  Target <span className="text-danger">*</span>
+                </Label>
+                {targets.length > 1 && (
+                  <button
+                    type="button"
+                    onClick={toggleAll}
+                    className="text-[13px] font-medium text-primary hover:underline"
+                  >
+                    {allSelected ? "Hapus semua" : "Pilih semua"}
+                  </button>
+                )}
+              </div>
+
+              {targetsLoading ? (
+                <p className="text-[14px] text-ink-muted-48">
+                  Memuat target...
+                </p>
+              ) : targets.length === 0 ? (
+                <p className="text-[14px] text-danger">
+                  Tidak ada target tersedia. Hubungi admin.
+                </p>
+              ) : (
+                <div className="grid gap-2 sm:grid-cols-2">
+                  {targets.map((t) => (
+                    <TargetCard
+                      key={t.key}
+                      id={`target-${t.key}`}
+                      label={t.label}
+                      sublabel={KIND_LABEL[t.kind]}
+                      value={t.key}
+                      {...register("targetKeys")}
+                    />
+                  ))}
+                </div>
+              )}
+              <FieldError message={errors.targetKeys?.message} />
             </div>
-            <Textarea
-              id="mitigasi"
-              maxLength={MITIGASI_MAX}
-              {...register("mitigasi")}
-            />
-            <FieldError message={errors.mitigasi?.message} />
-          </div>
 
-          <div>
-            <Label htmlFor="image">Gambar (opsional)</Label>
-            <input
-              ref={fileInputRef}
-              id="image"
-              type="file"
-              accept="image/jpeg,image/png,image/webp"
-              onChange={handleImageChange}
-              className="block w-full text-[14px] text-ink-muted-80 file:mr-4 file:rounded-pill file:border-0 file:bg-canvas-parchment file:px-4 file:py-2 file:text-[14px] file:font-semibold file:text-ink-muted-80"
-            />
-            <p className="mt-1 text-[12px] text-ink-muted-48">
-              JPEG, PNG, atau WebP. Maksimal 5MB. Metadata EXIF (termasuk lokasi) akan dihapus otomatis sebelum dikirim. Bisa juga tempel langsung (Ctrl+V) setelah screenshot.
-            </p>
-            {imagePreviewUrl && (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                src={imagePreviewUrl}
-                alt="Preview gambar terlampir"
-                className="mt-2 max-h-32 rounded-lg border border-hairline"
+            <div>
+              <div className="mb-1.5 flex items-baseline justify-between">
+                <Label htmlFor="deskripsi" className="mb-0">
+                  Deskripsi <span className="text-danger">*</span>
+                </Label>
+                <span className="tabular text-[12px] text-ink-faint">
+                  {deskripsiValue.length}/{DESKRIPSI_MAX}
+                </span>
+              </div>
+              <Textarea
+                id="deskripsi"
+                maxLength={DESKRIPSI_MAX}
+                placeholder="Jelaskan kejadian, dampak, dan sistem yang terdampak"
+                className="min-h-32"
+                {...register("deskripsi")}
               />
-            )}
-            <FieldError message={imageError ?? undefined} />
-          </div>
+              <FieldError message={errors.deskripsi?.message} />
+            </div>
 
-          <FieldError message={submitError ?? undefined} />
+            <div>
+              <div className="mb-1.5 flex items-baseline justify-between">
+                <Label htmlFor="mitigasi" className="mb-0">
+                  Mitigasi <span className="text-danger">*</span>
+                </Label>
+                <span className="tabular text-[12px] text-ink-faint">
+                  {mitigasiValue.length}/{MITIGASI_MAX}
+                </span>
+              </div>
+              <Textarea
+                id="mitigasi"
+                maxLength={MITIGASI_MAX}
+                placeholder="Langkah yang sudah atau akan dilakukan"
+                className="min-h-32"
+                {...register("mitigasi")}
+              />
+              <FieldError message={errors.mitigasi?.message} />
+            </div>
 
-          <div className="flex items-center justify-between gap-4 pt-1">
-            <Checkbox
-              id="skip-preview"
-              label="Jangan tampilkan konfirmasi lagi"
-              checked={skipPreview}
-              onChange={(e) => updateSkipPreview(e.target.checked)}
-            />
-          </div>
+            <div>
+              <Label htmlFor="image">Gambar (opsional)</Label>
 
-          <Button
-            type="submit"
-            className="w-full gap-2"
-            disabled={submitting}
-          >
-            {submitting && <Spinner />}
-            {submitting
-              ? "Mengirim..."
-              : skipPreview
-                ? "Kirim ke Telegram"
-                : "Periksa & Kirim"}
-          </Button>
-        </form>
-      </Card>
+              {imagePreviewUrl ? (
+                <div className="flex items-start gap-3 rounded-lg border border-hairline-strong p-2.5">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={imagePreviewUrl}
+                    alt="Pratinjau gambar terlampir"
+                    className="size-16 shrink-0 rounded object-cover"
+                  />
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-[13px] font-medium text-ink">
+                      {imageFile?.name}
+                    </span>
+                    <span className="tabular block text-[12px] text-ink-muted-48">
+                      {((imageFile?.size ?? 0) / 1024 / 1024).toFixed(2)} MB
+                    </span>
+                  </span>
+                  <button
+                    type="button"
+                    onClick={clearImage}
+                    aria-label="Hapus gambar"
+                    className="rounded p-1 text-ink-muted-48 transition-colors hover:bg-canvas-parchment hover:text-danger"
+                  >
+                    <X className="size-4" />
+                  </button>
+                </div>
+              ) : (
+                <label
+                  htmlFor="image"
+                  className="flex cursor-pointer items-center gap-2.5 rounded-lg border border-dashed border-hairline-strong px-3 py-3 text-[13px] text-ink-muted-48 transition-colors hover:border-primary-focus hover:text-ink-muted-80"
+                >
+                  <ImagePlus className="size-4 shrink-0" />
+                  Pilih file, atau tempel screenshot dengan Ctrl+V
+                </label>
+              )}
+
+              <input
+                ref={fileInputRef}
+                id="image"
+                type="file"
+                accept="image/jpeg,image/png,image/webp"
+                onChange={handleImageChange}
+                className="sr-only"
+              />
+              <p className="mt-1.5 text-[12px] text-ink-muted-48">
+                JPEG, PNG, atau WebP. Maksimal 5MB. Metadata EXIF (termasuk
+                lokasi) dihapus otomatis sebelum dikirim.
+              </p>
+              <FieldError message={imageError ?? undefined} />
+            </div>
+
+            <FieldError message={submitError ?? undefined} />
+
+            <div className="flex flex-wrap items-center justify-between gap-3 border-t border-hairline pt-5">
+              <Checkbox
+                id="skip-preview"
+                label="Jangan tampilkan konfirmasi lagi"
+                checked={skipPreview}
+                onChange={(e) => updateSkipPreview(e.target.checked)}
+              />
+              <Button type="submit" size="lg" disabled={submitting}>
+                {submitting ? <Spinner /> : <Send />}
+                {submitting
+                  ? "Mengirim..."
+                  : skipPreview
+                    ? "Kirim ke Telegram"
+                    : "Periksa & Kirim"}
+              </Button>
+            </div>
+          </form>
+        </Card>
+
+        <TelegramPreview
+          judul={judulValue}
+          tanggal={tanggalValue}
+          deskripsi={deskripsiValue}
+          mitigasi={mitigasiValue}
+          submittedBy={username}
+          targetLabels={selectedTargetLabels}
+          imagePreviewUrl={imagePreviewUrl}
+          className="lg:sticky lg:top-6"
+        />
+      </div>
 
       {showPreview && (
         <ReportPreviewDialog

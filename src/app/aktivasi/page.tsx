@@ -4,15 +4,19 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
+import { Info } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Spinner } from "@/components/ui/spinner";
-import { Card, Label, FieldError } from "@/components/ui/card";
+import { Label, FieldError } from "@/components/ui/card";
 import { TotpSetupStep } from "@/components/totp-setup-step";
+import { AuthShowcase } from "@/components/auth-showcase";
 
 type Step =
   | { kind: "code" }
   | { kind: "setup"; qrDataUrl: string; manualKey: string };
+
+const ACTIVATION_CODE_LENGTH = 8;
 
 export default function AktivasiPage() {
   const router = useRouter();
@@ -57,86 +61,115 @@ export default function AktivasiPage() {
   }
 
   return (
-    <main className="flex flex-1 flex-col items-center justify-center px-4 py-12">
-      <Image
-        src="/bankjateng.png"
-        alt="Bank Jateng"
-        width={200}
-        height={92}
-        className="mb-6 h-11 w-auto"
-        priority
-      />
-      <Card className="w-full max-w-sm">
-        {step.kind === "code" && (
-          <>
-            <h1 className="text-[28px] font-semibold text-ink mb-1">
-              Aktivasi Akun
-            </h1>
-            <p className="text-[14px] text-ink-muted-48 mb-6">
-              Masukkan username dan kode aktivasi yang diberikan admin.
-            </p>
-            <form
-              onSubmit={handleActivateSubmit}
-              method="post"
-              className="space-y-4"
-            >
-              <div>
-                <Label htmlFor="username">Username</Label>
-                <Input
-                  id="username"
-                  name="username"
-                  autoComplete="username"
-                  autoFocus
-                  value={username}
-                  onChange={(e) => setUsername(e.target.value)}
-                  required
-                />
-              </div>
-              <div>
-                <Label htmlFor="activationCode">Kode Aktivasi</Label>
-                <Input
-                  id="activationCode"
-                  name="activationCode"
-                  autoComplete="off"
-                  value={activationCode}
-                  onChange={(e) =>
-                    setActivationCode(e.target.value.toUpperCase())
-                  }
-                  placeholder="X7K9M4PQ"
-                  required
-                />
-              </div>
-              <FieldError message={error ?? undefined} />
-              <Button
-                type="submit"
-                className="w-full gap-2"
-                disabled={submitting || !mounted}
-              >
-                {submitting && <Spinner />}
-                {submitting ? "Memeriksa..." : "Aktivasi"}
-              </Button>
-            </form>
-            <p className="mt-4 text-center text-[14px] text-ink-muted-48">
-              Sudah punya akun aktif?{" "}
-              <Link href="/login" className="text-primary hover:underline">
-                Masuk
-              </Link>
-            </p>
-          </>
-        )}
+    <div className="grid min-h-dvh lg:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)]">
+      <AuthShowcase />
 
-        {step.kind === "setup" && (
-          <TotpSetupStep
-            username={username}
-            qrDataUrl={step.qrDataUrl}
-            manualKey={step.manualKey}
-            onConfirmed={() => {
-              router.push("/form");
-              router.refresh();
-            }}
-          />
-        )}
-      </Card>
-    </main>
+      <main className="flex items-center justify-center bg-canvas-parchment px-6 py-12">
+        <div className="w-full max-w-sm">
+          {step.kind === "code" ? (
+            <>
+              <Image
+                src="/bankjateng.png"
+                alt="Bank Jateng"
+                width={1024}
+                height={379}
+                className="h-8 w-auto"
+                priority
+              />
+              <h1 className="mt-6 text-[30px] font-semibold tracking-tight text-ink">
+                Aktivasi Akun
+              </h1>
+              <p className="mt-1 text-[14px] text-ink-muted-48">
+                Masukkan username dan kode aktivasi yang diberikan admin.
+              </p>
+
+              <form
+                onSubmit={handleActivateSubmit}
+                method="post"
+                className="mt-7 space-y-5"
+              >
+                <div>
+                  <Label htmlFor="username">Username</Label>
+                  <Input
+                    id="username"
+                    name="username"
+                    autoComplete="username"
+                    autoFocus
+                    placeholder="nama.pengguna"
+                    value={username}
+                    onChange={(e) => setUsername(e.target.value)}
+                    required
+                  />
+                </div>
+
+                <div>
+                  <div className="mb-1.5 flex items-baseline justify-between">
+                    <Label htmlFor="activationCode" className="mb-0">
+                      Kode Aktivasi
+                    </Label>
+                    <span className="tabular text-[12px] text-ink-faint">
+                      {activationCode.length}/{ACTIVATION_CODE_LENGTH}
+                    </span>
+                  </div>
+                  <Input
+                    id="activationCode"
+                    name="activationCode"
+                    autoComplete="off"
+                    autoCapitalize="characters"
+                    spellCheck={false}
+                    maxLength={ACTIVATION_CODE_LENGTH}
+                    value={activationCode}
+                    onChange={(e) =>
+                      setActivationCode(e.target.value.toUpperCase())
+                    }
+                    placeholder="X7K9M4PQ"
+                    className="font-mono tracking-[0.2em] placeholder:tracking-[0.2em]"
+                    required
+                  />
+                </div>
+
+                <p className="flex gap-2.5 rounded-lg bg-warning-soft px-3 py-2.5 text-[13px] text-warning">
+                  <Info className="mt-0.5 size-4 shrink-0" />
+                  Setelah aktivasi, Anda akan diminta memindai QR code dengan
+                  aplikasi authenticator.
+                </p>
+
+                <FieldError message={error ?? undefined} />
+
+                <Button
+                  type="submit"
+                  size="lg"
+                  className="w-full"
+                  disabled={submitting || !mounted}
+                >
+                  {submitting && <Spinner />}
+                  {submitting ? "Memeriksa..." : "Aktivasi"}
+                </Button>
+              </form>
+
+              <p className="mt-6 border-t border-hairline pt-5 text-center text-[13px] text-ink-muted-48">
+                Sudah punya akun aktif?{" "}
+                <Link
+                  href="/login"
+                  className="font-medium text-primary hover:underline"
+                >
+                  Masuk
+                </Link>
+              </p>
+            </>
+          ) : (
+            <TotpSetupStep
+              username={username}
+              qrDataUrl={step.qrDataUrl}
+              manualKey={step.manualKey}
+              onConfirmed={() => {
+                router.push("/form");
+                router.refresh();
+              }}
+            />
+          )}
+        </div>
+      </main>
+    </div>
   );
 }

@@ -1,11 +1,14 @@
+import Link from "next/link";
 import { desc, eq } from "drizzle-orm";
+import { Plus } from "lucide-react";
 import { getSession } from "@/lib/auth/session";
 import { db } from "@/lib/db";
 import { reports } from "@/lib/db/schema";
 import { getPublicTargets } from "@/lib/targets";
 import { HistoryTable } from "@/components/history-table";
-import { Header } from "@/components/header";
+import { AppShell } from "@/components/app-shell";
 import { SubmitNotice } from "@/components/submit-notice";
+import { Button } from "@/components/ui/button";
 
 export default async function HistoryPage() {
   const session = await getSession();
@@ -25,26 +28,35 @@ export default async function HistoryPage() {
     : [];
 
   return (
-    <>
-      <Header username={session?.username} active="history" />
-      <main className="flex flex-1 flex-col items-center px-4 py-12">
-        <div className="w-full max-w-3xl mb-6">
-          <h1 className="text-[28px] font-semibold text-ink">Riwayat Saya</h1>
-          <p className="mt-1 text-[14px] text-ink-muted-48">
-            Daftar laporan yang pernah Anda kirim, lengkap dengan status dan
-            target pengirimannya.
-          </p>
+    <AppShell username={session?.username} reportCount={rows.length}>
+      <main className="mx-auto max-w-5xl px-4 py-8 sm:px-6 lg:py-10">
+        <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <h1 className="text-[26px] font-semibold tracking-tight text-ink">
+              Riwayat Saya
+            </h1>
+            <p className="mt-1 text-[14px] text-ink-muted-48">
+              Daftar laporan yang pernah Anda kirim, lengkap dengan status dan
+              target pengirimannya.
+            </p>
+          </div>
+          <Link href="/form">
+            <Button>
+              <Plus />
+              Laporan Baru
+            </Button>
+          </Link>
         </div>
-        <div className="w-full max-w-3xl">
-          <SubmitNotice />
-          <HistoryTable
-            reports={rows}
-            targetLabels={Object.fromEntries(
-              getPublicTargets().map((t) => [t.key, t.label])
-            )}
-          />
-        </div>
+
+        <SubmitNotice />
+
+        <HistoryTable
+          reports={rows}
+          targetLabels={Object.fromEntries(
+            getPublicTargets().map((t) => [t.key, t.label])
+          )}
+        />
       </main>
-    </>
+    </AppShell>
   );
 }

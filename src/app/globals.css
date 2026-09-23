@@ -3,26 +3,35 @@
 /*
  * Design tokens: Bank Jateng brand colors (sampled directly from
  * public/bankjateng.png via pixel scan — navy #000a63, gold #fed207, red
- * #fa1c24 — not eyeballed) applied to the forms/utility layout language
- * established from the original DESIGN.md pass: pill buttons, rounded.lg
- * cards, 8px-based spacing, one soft shadow used sparingly.
+ * #fa1c24 — not eyeballed).
  *
  * Light theme only — no dark mode variant (deliberate choice for this
  * institutional/internal tool).
  */
 :root {
-  --color-primary: #000a63;
-  --color-primary-focus: #262f7a;
-  --color-accent-gold: #fed207;
+  --color-primary: #16225c;
+  --color-primary-deep: #111b4d;
+  --color-primary-focus: #2a3a86;
+  --color-accent-gold: #fbbf24;
   --color-accent-red: #fa1c24;
-  --color-ink: #1d1d1f;
-  --color-ink-muted-80: #333333;
-  --color-ink-muted-48: #7a7a7a;
+
+  --color-ink: #10131f;
+  --color-ink-muted-80: #3f4557;
+  --color-ink-muted-48: #767d90;
+  --color-ink-faint: #9aa1b2;
+
   --color-canvas: #ffffff;
-  --color-canvas-parchment: #f5f5f7;
-  --color-hairline: #e0e0e0;
-  --color-danger: #d70015;
-  --color-success: #1a7f37;
+  --color-canvas-parchment: #f4f6fa;
+  --color-canvas-subtle: #fafbfd;
+  --color-hairline: #e4e8f0;
+  --color-hairline-strong: #d3d9e5;
+
+  --color-danger: #d92d20;
+  --color-danger-soft: #fef3f2;
+  --color-success: #12855b;
+  --color-success-soft: #ecfdf3;
+  --color-warning: #b54708;
+  --color-warning-soft: #fffaeb;
 
   --background: var(--color-canvas-parchment);
   --foreground: var(--color-ink);
@@ -32,19 +41,28 @@
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-primary: var(--color-primary);
+  --color-primary-deep: var(--color-primary-deep);
   --color-primary-focus: var(--color-primary-focus);
   --color-accent-gold: var(--color-accent-gold);
   --color-accent-red: var(--color-accent-red);
   --color-ink: var(--color-ink);
   --color-ink-muted-80: var(--color-ink-muted-80);
   --color-ink-muted-48: var(--color-ink-muted-48);
+  --color-ink-faint: var(--color-ink-faint);
   --color-canvas: var(--color-canvas);
   --color-canvas-parchment: var(--color-canvas-parchment);
+  --color-canvas-subtle: var(--color-canvas-subtle);
   --color-hairline: var(--color-hairline);
+  --color-hairline-strong: var(--color-hairline-strong);
   --color-danger: var(--color-danger);
+  --color-danger-soft: var(--color-danger-soft);
   --color-success: var(--color-success);
+  --color-success-soft: var(--color-success-soft);
+  --color-warning: var(--color-warning);
+  --color-warning-soft: var(--color-warning-soft);
   --font-sans: var(--font-inter);
-  --radius-lg: 18px;
+  --font-mono: ui-monospace, "SF Mono", "Cascadia Mono", Menlo, monospace;
+  --radius-lg: 14px;
   --radius-pill: 9999px;
 }
 
@@ -52,7 +70,12 @@ body {
   background: var(--background);
   color: var(--foreground);
   font-family: var(--font-sans), system-ui, -apple-system, sans-serif;
-  font-size: 17px;
-  line-height: 1.47;
-  letter-spacing: -0.374px;
+  font-size: 15px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Tabular figures for timestamps and counters so columns line up. */
+.tabular {
+  font-variant-numeric: tabular-nums;
 }

@@ -2,8 +2,9 @@
 
 import { useEffect } from "react";
 import type { InferSelectModel } from "drizzle-orm";
+import { ImageOff, X } from "lucide-react";
 import type { reports } from "@/lib/db/schema";
-import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 
 type Report = InferSelectModel<typeof reports>;
@@ -14,9 +15,17 @@ const STATUS_LABEL: Record<string, string> = {
   partial: "Sebagian gagal",
 };
 
+const STATUS_VARIANT: Record<string, "success" | "danger" | "warning"> = {
+  sent: "success",
+  failed: "danger",
+  partial: "warning",
+};
+
 interface Props {
   report: Report;
   targetLabels: string[];
+  targetErrors: Record<string, string>;
+  allTargetLabels: Record<string, string>;
   onClose: () => void;
 }
 
@@ -27,7 +36,13 @@ interface Props {
  * persists it, by design, so there's nothing to display for hasImage=true
  * beyond the fact that one was attached at send time.
  */
-export function ReportDetailDialog({ report, targetLabels, onClose }: Props) {
+export function ReportDetailDialog({
+  report,
+  targetLabels,
+  targetErrors,
+  allTargetLabels,
+  onClose,
+}: Props) {
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
       if (e.key === "Escape") onClose();
@@ -36,53 +51,104 @@ export function ReportDetailDialog({ report, targetLabels, onClose }: Props) {
     return () => document.removeEventListener("keydown", onKeyDown);
   }, [onClose]);
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/40 px-4">
-      <Card className="w-full max-w-lg max-h-[85vh] overflow-y-auto">
-        <div className="flex items-start justify-between gap-4 mb-1">
-          <h2 className="text-[21px] font-semibold text-ink">{report.judul}</h2>
-          <span className="shrink-0 text-[13px] text-ink-muted-48">
-            {STATUS_LABEL[report.status] ?? report.status}
-          </span>
-        </div>
-        <p className="text-[14px] text-ink-muted-48 mb-5">
-          {new Date(report.createdAt).toLocaleString("id-ID")}
-        </p>
+  const errorEntries = Object.entries(targetErrors);
 
-        <dl className="space-y-3 text-[14px]">
-          <div>
-            <dt className="font-semibold text-ink-muted-80">Target</dt>
-            <dd className="text-ink">{targetLabels.join(", ")}</dd>
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-ink/40 p-4"
+      onClick={onClose}
+    >
+      <Card
+        className="flex max-h-[85vh] w-full max-w-lg flex-col"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-start justify-between gap-3 border-b border-hairline p-5">
+          <div className="min-w-0">
+            <h2 className="text-[18px] font-semibold leading-snug text-ink">
+              {report.judul}
+            </h2>
+            <p className="tabular mt-1 text-[13px] text-ink-muted-48">
+              {new Date(report.createdAt).toLocaleString("id-ID", {
+                day: "2-digit",
+                month: "long",
+                year: "numeric",
+                hour: "2-digit",
+                minute: "2-digit",
+              })}
+            </p>
           </div>
-          <div>
-            <dt className="font-semibold text-ink-muted-80">Tanggal Kejadian</dt>
-            <dd className="text-ink">{report.tanggal}</dd>
+          <button
+            onClick={onClose}
+            aria-label="Tutup"
+            className="shrink-0 rounded-lg p-1.5 text-ink-muted-48 transition-colors hover:bg-canvas-parchment hover:text-ink"
+          >
+            <X className="size-4" />
+          </button>
+        </div>
+
+        <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-5 text-[14px]">
+          <div className="flex flex-wrap items-center gap-2">
+            <Badge dot variant={STATUS_VARIANT[report.status] ?? "neutral"}>
+              {STATUS_LABEL[report.status] ?? report.status}
+            </Badge>
+            {targetLabels.map((label) => (
+              <Badge key={label} variant="outline">
+                {label}
+              </Badge>
+            ))}
           </div>
-          <div>
-            <dt className="font-semibold text-ink-muted-80">Deskripsi</dt>
-            <dd className="text-ink whitespace-pre-wrap">{report.deskripsi}</dd>
-          </div>
-          <div>
-            <dt className="font-semibold text-ink-muted-80">Mitigasi</dt>
-            <dd className="text-ink whitespace-pre-wrap">{report.mitigasi}</dd>
-          </div>
-          {report.hasImage && (
-            <div>
-              <dt className="font-semibold text-ink-muted-80">Gambar</dt>
-              <dd className="text-[13px] text-ink-muted-48">
-                Laporan ini menyertakan gambar saat dikirim. Gambar tidak
-                disimpan di server (langsung diteruskan ke Telegram) sehingga
-                tidak dapat ditampilkan ulang di sini — lihat riwayat chat
-                Telegram target untuk melihatnya kembali.
-              </dd>
+
+          {errorEntries.length > 0 && (
+            <div className="rounded-lg bg-danger-soft p-3">
+              <p className="text-[13px] font-medium text-danger">
+                Gagal terkirim ke:
+              </p>
+              <ul className="mt-1 space-y-0.5">
+                {errorEntries.map(([key, msg]) => (
+                  <li key={key} className="text-[13px] text-danger">
+                    <span className="font-medium">
+                      {allTargetLabels[key] ?? key}:
+                    </span>{" "}
+                    {msg}
+                  </li>
+                ))}
+              </ul>
             </div>
           )}
-        </dl>
 
-        <div className="mt-6">
-          <Button variant="secondary" onClick={onClose} className="w-full">
-            Tutup
-          </Button>
+          <div>
+            <p className="text-[12px] font-semibold uppercase tracking-wider text-ink-faint">
+              Tanggal kejadian
+            </p>
+            <p className="mt-1 text-ink">{report.tanggal}</p>
+          </div>
+
+          <div>
+            <p className="text-[12px] font-semibold uppercase tracking-wider text-ink-faint">
+              Deskripsi
+            </p>
+            <p className="mt-1 whitespace-pre-wrap break-words text-ink">
+              {report.deskripsi}
+            </p>
+          </div>
+
+          <div>
+            <p className="text-[12px] font-semibold uppercase tracking-wider text-ink-faint">
+              Mitigasi
+            </p>
+            <p className="mt-1 whitespace-pre-wrap break-words text-ink">
+              {report.mitigasi}
+            </p>
+          </div>
+
+          {report.hasImage && (
+            <p className="flex gap-2.5 rounded-lg bg-canvas-parchment p-3 text-[13px] text-ink-muted-48">
+              <ImageOff className="mt-0.5 size-4 shrink-0" />
+              Laporan ini menyertakan gambar. Gambar tidak disimpan di server
+              (langsung diteruskan ke Telegram), jadi tidak bisa ditampilkan
+              ulang di sini — lihat riwayat chat Telegram target.
+            </p>
+          )}
         </div>
       </Card>
     </div>

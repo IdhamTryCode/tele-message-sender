@@ -1,6 +1,8 @@
 "use client";
 
+import { AlertTriangle, Send } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { Spinner } from "@/components/ui/spinner";
 import type { ReportInput } from "@/lib/validation/report";
@@ -29,54 +31,80 @@ export function ReportPreviewDialog({
   onCancel,
 }: Props) {
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/40 px-4">
-      <Card className="w-full max-w-lg max-h-[85vh] overflow-y-auto">
-        <h2 className="text-[21px] font-semibold text-ink mb-1">
-          Periksa sebelum mengirim
-        </h2>
-        <p className="text-[14px] text-ink-muted-48 mb-5">
-          Pesan tidak dapat ditarik kembali setelah terkirim ke Telegram.
-        </p>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/40 p-4">
+      <Card className="flex max-h-[85vh] w-full max-w-lg flex-col">
+        <div className="border-b border-hairline p-5">
+          <h2 className="text-[18px] font-semibold text-ink">
+            Periksa sebelum mengirim
+          </h2>
+          <p className="mt-1.5 flex gap-2 text-[13px] text-warning">
+            <AlertTriangle className="mt-0.5 size-4 shrink-0" />
+            Pesan tidak dapat ditarik kembali setelah terkirim ke Telegram.
+          </p>
+        </div>
 
-        <dl className="space-y-3 text-[14px]">
+        <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-5 text-[14px]">
           <div>
-            <dt className="font-semibold text-ink-muted-80">Target</dt>
-            <dd className="text-ink">{targetLabels.join(", ")}</dd>
+            <p className="text-[12px] font-semibold uppercase tracking-wider text-ink-faint">
+              Target
+            </p>
+            <span className="mt-1.5 flex flex-wrap gap-1.5">
+              {targetLabels.map((label) => (
+                <Badge key={label} variant="outline">
+                  {label}
+                </Badge>
+              ))}
+            </span>
           </div>
+
           <div>
-            <dt className="font-semibold text-ink-muted-80">Judul</dt>
-            <dd className="text-ink">{data.judul}</dd>
+            <p className="text-[12px] font-semibold uppercase tracking-wider text-ink-faint">
+              Judul
+            </p>
+            <p className="mt-1 break-words text-ink">{data.judul}</p>
           </div>
+
           <div>
-            <dt className="font-semibold text-ink-muted-80">Tanggal</dt>
-            <dd className="text-ink">{data.tanggal}</dd>
+            <p className="text-[12px] font-semibold uppercase tracking-wider text-ink-faint">
+              Tanggal
+            </p>
+            <p className="mt-1 text-ink">{data.tanggal}</p>
           </div>
+
           <div>
-            <dt className="font-semibold text-ink-muted-80">Deskripsi</dt>
-            <dd className="text-ink whitespace-pre-wrap">{data.deskripsi}</dd>
+            <p className="text-[12px] font-semibold uppercase tracking-wider text-ink-faint">
+              Deskripsi
+            </p>
+            <p className="mt-1 whitespace-pre-wrap break-words text-ink">
+              {data.deskripsi}
+            </p>
           </div>
+
           <div>
-            <dt className="font-semibold text-ink-muted-80">Mitigasi</dt>
-            <dd className="text-ink whitespace-pre-wrap">{data.mitigasi}</dd>
+            <p className="text-[12px] font-semibold uppercase tracking-wider text-ink-faint">
+              Mitigasi
+            </p>
+            <p className="mt-1 whitespace-pre-wrap break-words text-ink">
+              {data.mitigasi}
+            </p>
           </div>
+
           {imagePreviewUrl && (
             <div>
-              <dt className="font-semibold text-ink-muted-80 mb-1.5">
+              <p className="text-[12px] font-semibold uppercase tracking-wider text-ink-faint">
                 Gambar
-              </dt>
-              <dd>
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={imagePreviewUrl}
-                  alt="Preview lampiran"
-                  className="max-h-48 rounded-lg border border-hairline"
-                />
-              </dd>
+              </p>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={imagePreviewUrl}
+                alt="Pratinjau lampiran"
+                className="mt-1.5 max-h-48 rounded-lg border border-hairline"
+              />
             </div>
           )}
-        </dl>
+        </div>
 
-        <div className="mt-6 flex gap-3">
+        <div className="flex gap-3 border-t border-hairline p-5">
           <Button
             variant="secondary"
             onClick={onCancel}
@@ -85,12 +113,8 @@ export function ReportPreviewDialog({
           >
             Kembali
           </Button>
-          <Button
-            onClick={onConfirm}
-            disabled={submitting}
-            className="flex-1 gap-2"
-          >
-            {submitting && <Spinner />}
+          <Button onClick={onConfirm} disabled={submitting} className="flex-1">
+            {submitting ? <Spinner /> : <Send />}
             {submitting ? "Mengirim..." : "Kirim ke Telegram"}
           </Button>
         </div>
