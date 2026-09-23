@@ -41,10 +41,10 @@ function buildTargets(): TelegramTarget[] {
       envVar: "TG_CHAT_BLUE_TEAM",
     },
     {
-      key: "dm-idham",
-      label: "DM Idham",
+      key: "dm-pribadi",
+      label: "DM Pribadi",
       kind: "dm",
-      envVar: "TG_CHAT_DM_IDHAM",
+      envVar: "TG_CHAT_PRIBADI",
     },
   ];
 
