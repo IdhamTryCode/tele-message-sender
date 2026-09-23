@@ -261,7 +261,7 @@ export function ReportForm({ username }: { username: string }) {
             <div className="grid gap-5 sm:grid-cols-2">
               <div>
                 <Label htmlFor="judul">
-                  Judul <span className="text-danger">*</span>
+                  Judul <span className="text-brand-red">*</span>
                 </Label>
                 <Input
                   id="judul"
@@ -273,7 +273,7 @@ export function ReportForm({ username }: { username: string }) {
 
               <div>
                 <Label htmlFor="tanggal">
-                  Tanggal <span className="text-danger">*</span>
+                  Tanggal <span className="text-brand-red">*</span>
                 </Label>
                 <Input
                   id="tanggal"
@@ -288,7 +288,7 @@ export function ReportForm({ username }: { username: string }) {
             <div>
               <div className="mb-1.5 flex items-baseline justify-between">
                 <Label className="mb-0">
-                  Target <span className="text-danger">*</span>
+                  Target <span className="text-brand-red">*</span>
                 </Label>
                 {targets.length > 1 && (
                   <button
@@ -329,7 +329,7 @@ export function ReportForm({ username }: { username: string }) {
             <div>
               <div className="mb-1.5 flex items-baseline justify-between">
                 <Label htmlFor="deskripsi" className="mb-0">
-                  Deskripsi <span className="text-danger">*</span>
+                  Deskripsi <span className="text-brand-red">*</span>
                 </Label>
                 <span className="tabular text-[12px] text-ink-faint">
                   {deskripsiValue.length}/{DESKRIPSI_MAX}
@@ -348,7 +348,7 @@ export function ReportForm({ username }: { username: string }) {
             <div>
               <div className="mb-1.5 flex items-baseline justify-between">
                 <Label htmlFor="mitigasi" className="mb-0">
-                  Mitigasi <span className="text-danger">*</span>
+                  Mitigasi <span className="text-brand-red">*</span>
                 </Label>
                 <span className="tabular text-[12px] text-ink-faint">
                   {mitigasiValue.length}/{MITIGASI_MAX}

@@ -1,10 +1,11 @@
 import { ReactNode } from "react";
+import { Check } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 type Variant = "success" | "danger" | "info";
 
 const VARIANT_CLASSES: Record<Variant, string> = {
-  success: "bg-success-soft text-success",
+  success: "bg-brand-navy text-white",
   danger: "bg-danger-soft text-danger",
   info: "bg-warning-soft text-warning",
 };
@@ -25,12 +26,20 @@ export function Banner({ variant, children, className }: BannerProps) {
     <div
       role={variant === "danger" ? "alert" : "status"}
       className={cn(
-        "rounded-lg px-4 py-3 text-[14px]",
+        "flex items-start gap-2.5 rounded-lg px-4 py-3 text-[14px]",
         VARIANT_CLASSES[variant],
         className
       )}
     >
-      {children}
+      {variant === "success" && (
+        <span
+          aria-hidden
+          className="mt-0.5 flex size-4 shrink-0 items-center justify-center rounded-full bg-brand-yellow"
+        >
+          <Check className="size-3 text-brand-navy" strokeWidth={3} />
+        </span>
+      )}
+      <span className="min-w-0">{children}</span>
     </div>
   );
 }

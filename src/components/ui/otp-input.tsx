@@ -106,7 +106,7 @@ export function OtpInput({
           className={cn(
             "h-12 w-full min-w-0 rounded-lg border border-hairline-strong bg-canvas text-center",
             "tabular font-mono text-[22px] font-semibold text-ink",
-            "transition-colors focus:border-primary-focus focus:outline focus:outline-2 focus:outline-offset-[-1px] focus:outline-primary-focus",
+            "transition-colors focus:border-brand-navy focus:outline-none focus:ring-4 focus:ring-brand-yellow/30",
             "disabled:cursor-not-allowed disabled:opacity-60"
           )}
         />

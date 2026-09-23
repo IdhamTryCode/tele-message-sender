@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Label, FieldError } from "@/components/ui/card";
 import { OtpInput } from "@/components/ui/otp-input";
 import { AuthShowcase } from "@/components/auth-showcase";
+import { BrandStripe } from "@/components/brand-stripe";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -66,7 +67,8 @@ export default function LoginPage() {
     <div className="grid min-h-dvh lg:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)]">
       <AuthShowcase />
 
-      <main className="flex items-center justify-center bg-canvas-parchment px-6 py-12">
+      <main className="relative flex items-center justify-center bg-canvas-parchment px-6 py-12">
+        <BrandStripe className="absolute inset-x-0 top-0" />
         <div className="w-full max-w-sm">
           <Image
             src="/bankjateng.png"

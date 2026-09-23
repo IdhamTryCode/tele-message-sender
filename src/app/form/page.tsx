@@ -4,6 +4,7 @@ import { db } from "@/lib/db";
 import { reports } from "@/lib/db/schema";
 import { ReportForm } from "@/components/report-form";
 import { AppShell } from "@/components/app-shell";
+import { PageEyebrow } from "@/components/page-eyebrow";
 
 export default async function FormPage() {
   const session = await getSession();
@@ -21,6 +22,7 @@ export default async function FormPage() {
   return (
     <AppShell username={session?.username} reportCount={countRow?.value}>
       <main className="mx-auto max-w-5xl px-4 py-8 sm:px-6 lg:py-10">
+        <PageEyebrow />
         <h1 className="text-[26px] font-semibold tracking-tight text-ink">
           Laporan Baru
         </h1>

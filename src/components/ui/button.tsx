@@ -7,7 +7,7 @@ const buttonVariants = cva(
   cn(
     "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-lg",
     "font-medium transition-colors",
-    "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-focus",
+    "focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-brand-yellow/40",
     // A button that's disabled *because it's working* keeps its own colour
     // and shows a wait cursor — greying it out reads as "unavailable",
     // which is the wrong signal while a request is in flight. data-loading
@@ -19,7 +19,7 @@ const buttonVariants = cva(
   {
     variants: {
       variant: {
-        primary: "bg-primary text-white hover:bg-primary-deep",
+        primary: "bg-brand-navy text-white hover:bg-primary-deep",
         secondary:
           "border border-hairline-strong bg-canvas text-ink hover:bg-canvas-parchment",
         ghost: "text-ink-muted-80 hover:bg-canvas-parchment hover:text-ink",

@@ -133,7 +133,7 @@ export function HistoryTable({
   return (
     <>
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-        <div className="flex gap-1 rounded-lg border border-hairline bg-canvas p-1">
+        <div className="flex gap-1 overflow-x-auto rounded-lg border border-hairline bg-canvas p-1">
           {TABS.map((tab) => (
             <button
               key={tab.key}
@@ -141,12 +141,19 @@ export function HistoryTable({
               className={cn(
                 "flex items-center gap-1.5 rounded px-3 py-1.5 text-[13px] transition-colors",
                 filter === tab.key
-                  ? "bg-canvas-parchment font-medium text-ink"
+                  ? "bg-brand-navy-soft font-medium text-brand-navy"
                   : "text-ink-muted-48 hover:text-ink"
               )}
             >
               {tab.label}
-              <span className="tabular text-[12px] text-ink-faint">
+              <span
+                className={cn(
+                  "tabular text-[12px]",
+                  filter === tab.key
+                    ? "rounded-pill bg-brand-yellow px-1.5 py-0.5 text-[11px] font-semibold text-brand-navy"
+                    : "text-ink-faint"
+                )}
+              >
                 {counts[tab.key]}
               </span>
             </button>
@@ -166,18 +173,16 @@ export function HistoryTable({
       </div>
 
       {/* No overflow-hidden here: a scroll container between the viewport
-          and the sticky <thead> would cancel the stickiness. The rounded
-          corners are applied to the table's own first/last rows instead. */}
+          and the sticky <thead> would cancel the stickiness. */}
       <div className="rounded-lg border border-hairline bg-canvas">
-        {/* Horizontal scrolling only where the table can't fit. On lg+ the
-            container must NOT scroll, or it becomes the sticky header's
-            scroll root and the header stops sticking to the viewport. */}
-        <div className="overflow-x-auto rounded-lg lg:overflow-x-visible">
-          <table className="w-full min-w-[720px] text-[14px]">
-            {/* Header sticks below the mobile top bar (which is ~88px tall:
-                brand row + nav row); on lg the sidebar is fixed and there
-                is no top bar, so it sticks to the viewport top. */}
-            <thead className="sticky top-[88px] z-10 bg-canvas-subtle lg:top-0">
+        {/* Below xl the same rows render as cards (see further down). The
+            cutoff is xl, not lg, because the fixed 248px sidebar leaves a
+            1024px screen too narrow for six columns — and sideways
+            scrolling to reach the status column is exactly what someone
+            scanning for failures shouldn't have to do. */}
+        <div className="hidden xl:block">
+          <table className="w-full text-[14px]">
+            <thead className="sticky top-0 z-10 bg-canvas-subtle">
               <tr className="border-b border-hairline text-left">
                 {["Judul", "Tanggal", "Target", "Status", "Dikirim"].map(
                   (h) => (
@@ -201,7 +206,7 @@ export function HistoryTable({
                   <tr
                     key={r.id}
                     onClick={() => setDetailReport(r)}
-                    className="cursor-pointer border-b border-hairline transition-colors last:border-0 hover:bg-canvas-subtle"
+                    className="cursor-pointer border-b border-hairline transition-colors last:border-0 hover:bg-canvas-highlight"
                   >
                     <td className="max-w-[260px] px-4 py-3">
                       <span
@@ -249,6 +254,51 @@ export function HistoryTable({
           </table>
         </div>
 
+        {/* Card list: the same data stacked, for phone and tablet widths. */}
+        <ul className="xl:hidden">
+          {pageRows.map((r) => {
+            const keys = parseTargetKeys(r.targetKeys);
+            const errors = parseTargetErrors(r.targetErrors);
+            const errorCount = Object.keys(errors).length;
+            return (
+              <li key={r.id} className="border-b border-hairline last:border-0">
+                <button
+                  onClick={() => setDetailReport(r)}
+                  className="flex w-full items-start gap-3 px-4 py-3 text-left transition-colors hover:bg-canvas-highlight"
+                >
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate font-medium text-ink">
+                      {r.judul}
+                    </span>
+                    <span className="tabular mt-0.5 block text-[13px] text-ink-muted-48">
+                      {formatTanggal(r.tanggal)} · {formatTimestamp(r.createdAt)}
+                    </span>
+                    <span className="mt-2 flex flex-wrap items-center gap-1">
+                      <Badge dot variant={STATUS_VARIANT[r.status] ?? "neutral"}>
+                        {STATUS_LABEL[r.status] ?? r.status}
+                      </Badge>
+                      {keys.slice(0, 2).map((k) => (
+                        <Badge key={k} variant="neutral">
+                          {targetLabels[k] ?? k}
+                        </Badge>
+                      ))}
+                      {keys.length > 2 && (
+                        <Badge variant="outline">+{keys.length - 2}</Badge>
+                      )}
+                    </span>
+                    {errorCount > 0 && (
+                      <span className="mt-1.5 block text-[12px] text-ink-muted-48">
+                        {errorCount} dari {keys.length} target gagal
+                      </span>
+                    )}
+                  </span>
+                  <ChevronRight className="mt-0.5 size-4 shrink-0 text-ink-faint" />
+                </button>
+              </li>
+            );
+          })}
+        </ul>
+
         {visible.length === 0 && (
           <p className="px-4 py-10 text-center text-[14px] text-ink-muted-48">
             Tidak ada laporan yang cocok dengan filter ini.
@@ -258,10 +308,11 @@ export function HistoryTable({
         {visible.length > 0 && (
           <div className="flex flex-wrap items-center justify-between gap-3 border-t border-hairline px-4 py-3">
             <span className="tabular text-[13px] text-ink-muted-48">
-              Menampilkan {start + 1}–{Math.min(start + PAGE_SIZE, visible.length)}{" "}
-              dari {visible.length}
+              Menampilkan {start + 1}–
+              {Math.min(start + PAGE_SIZE, visible.length)} dari{" "}
+              {visible.length}
             </span>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-1 items-center justify-end gap-2">
               <Button
                 variant="secondary"
                 size="sm"

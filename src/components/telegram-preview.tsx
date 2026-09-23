@@ -83,7 +83,9 @@ export function TelegramPreview({
           )}
 
           <div className="p-3.5">
-            <span className="text-[13px] font-semibold text-primary">
+            {/* Telegram's own sender blue, not the brand navy — this
+                mirrors their UI, so it keeps their colour. */}
+            <span className="text-[13px] font-semibold text-[#2f7bbf]">
               Tele Message Sender
             </span>
 

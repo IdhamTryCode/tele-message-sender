@@ -58,8 +58,8 @@ export function TotpSetupStep({
 
   return (
     <>
-      <span className="flex size-10 items-center justify-center rounded-lg bg-primary/[0.06]">
-        <QrCode className="size-5 text-primary" />
+      <span className="flex size-10 items-center justify-center rounded-lg bg-brand-navy">
+        <QrCode className="size-5 text-brand-yellow" />
       </span>
       <h1 className="mt-5 text-[30px] font-semibold tracking-tight text-ink">
         Setup Authenticator

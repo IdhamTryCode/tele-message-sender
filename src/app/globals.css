@@ -1,19 +1,30 @@
 @import "tailwindcss";
 
 /*
- * Design tokens: Bank Jateng brand colors (sampled directly from
- * public/bankjateng.png via pixel scan — navy #000a63, gold #fed207, red
- * #fa1c24 — not eyeballed).
+ * Design tokens. The brand palette (navy/red/yellow) comes from the Bank
+ * Jateng logo; navy carries the UI as primary, while red and yellow are
+ * accents only.
+ *
+ * Note the two reds: `--color-brand-red` is decoration (the stripe, the
+ * swoosh, the required-field asterisk) and `--color-danger` is state
+ * (errors, failed sends). They're deliberately different values so a red
+ * flourish never reads as an error — keep them apart.
  *
  * Light theme only — no dark mode variant (deliberate choice for this
  * institutional/internal tool).
  */
 :root {
-  --color-primary: #16225c;
-  --color-primary-deep: #111b4d;
+  --color-brand-navy: #0c1467;
+  --color-brand-red: #d7141a;
+  --color-brand-yellow: #f6b300;
+  --color-brand-yellow-soft: #fff4d1;
+  --color-brand-navy-soft: #eef0fa;
+
+  --color-primary: var(--color-brand-navy);
+  --color-primary-deep: #141e8a;
   --color-primary-focus: #2a3a86;
-  --color-accent-gold: #fbbf24;
-  --color-accent-red: #fa1c24;
+  --color-accent-gold: var(--color-brand-yellow);
+  --color-accent-red: var(--color-brand-red);
 
   --color-ink: #10131f;
   --color-ink-muted-80: #3f4557;
@@ -21,13 +32,15 @@
   --color-ink-faint: #9aa1b2;
 
   --color-canvas: #ffffff;
-  --color-canvas-parchment: #f4f6fa;
+  --color-canvas-parchment: #f5f6f9;
   --color-canvas-subtle: #fafbfd;
+  /* Row hover: the faintest wash of brand yellow. */
+  --color-canvas-highlight: #fffbf0;
   --color-hairline: #e4e8f0;
   --color-hairline-strong: #d3d9e5;
 
-  --color-danger: #d92d20;
-  --color-danger-soft: #fef3f2;
+  --color-danger: #c0262d;
+  --color-danger-soft: #fdecec;
   --color-success: #12855b;
   --color-success-soft: #ecfdf3;
   --color-warning: #b54708;
@@ -40,6 +53,11 @@
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
+  --color-brand-navy: var(--color-brand-navy);
+  --color-brand-red: var(--color-brand-red);
+  --color-brand-yellow: var(--color-brand-yellow);
+  --color-brand-yellow-soft: var(--color-brand-yellow-soft);
+  --color-brand-navy-soft: var(--color-brand-navy-soft);
   --color-primary: var(--color-primary);
   --color-primary-deep: var(--color-primary-deep);
   --color-primary-focus: var(--color-primary-focus);
@@ -52,6 +70,7 @@
   --color-canvas: var(--color-canvas);
   --color-canvas-parchment: var(--color-canvas-parchment);
   --color-canvas-subtle: var(--color-canvas-subtle);
+  --color-canvas-highlight: var(--color-canvas-highlight);
   --color-hairline: var(--color-hairline);
   --color-hairline-strong: var(--color-hairline-strong);
   --color-danger: var(--color-danger);

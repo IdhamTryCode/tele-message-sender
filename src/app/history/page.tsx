@@ -7,6 +7,7 @@ import { reports } from "@/lib/db/schema";
 import { getPublicTargets } from "@/lib/targets";
 import { HistoryTable } from "@/components/history-table";
 import { AppShell } from "@/components/app-shell";
+import { PageEyebrow } from "@/components/page-eyebrow";
 import { SubmitNotice } from "@/components/submit-notice";
 import { Button } from "@/components/ui/button";
 
@@ -32,6 +33,7 @@ export default async function HistoryPage() {
       <main className="mx-auto max-w-5xl px-4 py-8 sm:px-6 lg:py-10">
         <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
           <div>
+            <PageEyebrow />
             <h1 className="text-[26px] font-semibold tracking-tight text-ink">
               Riwayat Saya
             </h1>
@@ -42,7 +44,7 @@ export default async function HistoryPage() {
           </div>
           <Link href="/form">
             <Button>
-              <Plus />
+              <Plus className="text-brand-yellow" />
               Laporan Baru
             </Button>
           </Link>
