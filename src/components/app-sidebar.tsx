@@ -62,14 +62,16 @@ export function AppSidebar({ username, reportCount }: Props) {
 
   return (
     <>
-      {/* Desktop: full sidebar */}
-      <aside className="hidden w-60 shrink-0 flex-col border-r border-hairline bg-canvas md:flex">
+      {/* Desktop: fixed sidebar, so page scroll never moves it. h-dvh with
+          its own overflow keeps the user block reachable even on a short
+          viewport — the nav scrolls, the user block stays pinned by mt-auto. */}
+      <aside className="fixed inset-y-0 left-0 z-30 hidden h-dvh w-[248px] flex-col overflow-y-auto border-r border-hairline bg-canvas lg:flex">
         <div className="flex flex-col gap-3 border-b border-hairline px-4 py-4">
           <Image
             src="/bankjateng.png"
             alt="Bank Jateng"
-            width={1024}
-            height={379}
+            width={1280}
+            height={591}
             className="h-6 w-auto self-start"
             priority
           />
@@ -79,9 +81,9 @@ export function AppSidebar({ username, reportCount }: Props) {
           </span>
         </div>
 
-        <nav className="flex flex-1 flex-col gap-1 p-3">{navLinks}</nav>
+        <nav className="flex flex-col gap-1 p-3">{navLinks}</nav>
 
-        <div className="flex items-center gap-2.5 border-t border-hairline p-3">
+        <div className="mt-auto flex items-center gap-2.5 border-t border-hairline p-3">
           <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-primary text-[13px] font-semibold text-white">
             {username?.[0]?.toUpperCase() ?? "?"}
           </span>
@@ -105,8 +107,8 @@ export function AppSidebar({ username, reportCount }: Props) {
         </div>
       </aside>
 
-      {/* Mobile: top bar with the same links laid out horizontally */}
-      <header className="fixed inset-x-0 top-0 z-30 border-b border-hairline bg-canvas md:hidden">
+      {/* Mobile/tablet: sticky top bar with the same links laid out horizontally */}
+      <header className="sticky top-0 z-20 border-b border-hairline bg-canvas lg:hidden">
         <div className="flex items-center gap-3 px-4 py-2.5">
           <span className="flex items-center gap-2 text-[14px] font-semibold text-ink">
             <Send className="size-3.5 text-accent-gold" />

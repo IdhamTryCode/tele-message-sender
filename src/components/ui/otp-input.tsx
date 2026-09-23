@@ -105,7 +105,7 @@ export function OtpInput({
           onFocus={(e) => e.target.select()}
           className={cn(
             "h-12 w-full min-w-0 rounded-lg border border-hairline-strong bg-canvas text-center",
-            "tabular text-[18px] font-medium text-ink",
+            "tabular font-mono text-[22px] font-semibold text-ink",
             "transition-colors focus:border-primary-focus focus:outline focus:outline-2 focus:outline-offset-[-1px] focus:outline-primary-focus",
             "disabled:cursor-not-allowed disabled:opacity-60"
           )}

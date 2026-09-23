@@ -4,18 +4,24 @@ import { Check, Send } from "lucide-react";
  * Left panel on /login and /aktivasi. The sample card is illustrative,
  * not real data — it shows what the product produces before the user has
  * ever signed in, which a bare logo can't.
+ *
+ * Every row shares one max-w-[480px] column so the brand mark, the
+ * headline and the footer line up on the same left edge, with the block
+ * as a whole centred in the panel.
  */
 export function AuthShowcase() {
   return (
-    <div className="relative hidden flex-col justify-between overflow-hidden bg-primary p-10 lg:flex">
-      <span className="flex items-center gap-2.5 text-[14px] font-semibold text-white">
-        <span className="flex size-7 items-center justify-center rounded-lg bg-accent-gold">
-          <Send className="size-3.5 text-primary" />
+    <div className="relative hidden flex-col justify-between bg-primary p-10 lg:flex">
+      <div className="mx-auto w-full max-w-[480px]">
+        <span className="flex items-center gap-2.5 text-[14px] font-semibold text-white">
+          <span className="flex size-7 items-center justify-center rounded-lg bg-accent-gold">
+            <Send className="size-3.5 text-primary" />
+          </span>
+          Tele Message Sender
         </span>
-        Tele Message Sender
-      </span>
+      </div>
 
-      <div className="max-w-md">
+      <div className="mx-auto w-full max-w-[480px]">
         <h2 className="text-[34px] font-semibold leading-[1.15] tracking-tight text-white">
           Satu laporan, terkirim ke semua tim di Telegram.
         </h2>
@@ -34,7 +40,7 @@ export function AuthShowcase() {
             Laporan: Aktivitas login mencurigakan
           </p>
           <p className="mt-1.5 text-[13px] text-ink-muted-48">
-            Tanggal: 03 Sep 2026
+            Tanggal: 3 Sep 2026
           </p>
           <p className="text-[13px] text-ink-muted-48">
             Target: Tim SOC, Tim Blue Team
@@ -46,9 +52,11 @@ export function AuthShowcase() {
         </div>
       </div>
 
-      <span className="text-[12px] text-white/50">
-        Aplikasi internal · Bank Jateng
-      </span>
+      <div className="mx-auto w-full max-w-[480px]">
+        <span className="text-[12px] text-white/50">
+          Aplikasi internal · Bank Jateng
+        </span>
+      </div>
     </div>
   );
 }

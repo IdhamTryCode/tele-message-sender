@@ -4,7 +4,6 @@ import { AlertTriangle, Send } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
-import { Spinner } from "@/components/ui/spinner";
 import type { ReportInput } from "@/lib/validation/report";
 
 interface Props {
@@ -113,8 +112,8 @@ export function ReportPreviewDialog({
           >
             Kembali
           </Button>
-          <Button onClick={onConfirm} disabled={submitting} className="flex-1">
-            {submitting ? <Spinner /> : <Send />}
+          <Button onClick={onConfirm} loading={submitting} className="flex-1">
+            {!submitting && <Send />}
             {submitting ? "Mengirim..." : "Kirim ke Telegram"}
           </Button>
         </div>

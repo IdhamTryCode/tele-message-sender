@@ -7,16 +7,22 @@ interface Props {
   children: ReactNode;
 }
 
-/** Sidebar + content column, shared by /form and /history. */
+/**
+ * Sidebar + content column, shared by /form and /history.
+ *
+ * The sidebar is `position: fixed`, so the content column offsets itself
+ * by the sidebar's width rather than sitting next to it in flow.
+ * overflow-x-clip (not -hidden) contains any stray wide child without
+ * making this element a scroll container — `hidden` would do that, and a
+ * scroll container between the viewport and a sticky element silently
+ * breaks the stickiness of anything inside (the preview column on /form,
+ * the table header on /history).
+ */
 export function AppShell({ username, reportCount, children }: Props) {
   return (
-    <div className="flex min-h-dvh">
+    <div className="min-h-dvh overflow-x-clip lg:pl-[248px]">
       <AppSidebar username={username} reportCount={reportCount} />
-      {/* pt clears the fixed mobile header; on md+ the sidebar is static
-          and the header is gone, so no offset is needed. */}
-      <div className="min-w-0 flex-1 overflow-x-hidden pt-[88px] md:pt-0">
-        {children}
-      </div>
+      {children}
     </div>
   );
 }

@@ -14,10 +14,10 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox, TargetCard } from "@/components/ui/checkbox";
-import { Spinner } from "@/components/ui/spinner";
 import { Card, Label, FieldError } from "@/components/ui/card";
 import { ReportPreviewDialog } from "@/components/report-preview-dialog";
 import { TelegramPreview } from "@/components/telegram-preview";
+import { cn } from "@/lib/utils";
 
 interface Target {
   key: string;
@@ -67,6 +67,7 @@ export function ReportForm({ username }: { username: string }) {
   // on mount, guarded by the `typeof window` check for SSR, not a sync
   // with an external system that changes over time.
   const [skipPreview, setSkipPreview] = useState(readSkipPreview);
+  const [dragOver, setDragOver] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const {
@@ -74,6 +75,7 @@ export function ReportForm({ username }: { username: string }) {
     handleSubmit,
     getValues,
     setValue,
+    reset,
     control,
     formState: { errors },
   } = useForm<ReportInput>({
@@ -168,6 +170,21 @@ export function ReportForm({ username }: { username: string }) {
     if (!file) return;
     e.preventDefault();
     applyImageFile(file);
+  }
+
+  function handleDrop(e: React.DragEvent) {
+    e.preventDefault();
+    setDragOver(false);
+    const file = Array.from(e.dataTransfer.files).find((f) =>
+      f.type.startsWith("image/")
+    );
+    if (file) applyImageFile(file);
+  }
+
+  function resetForm() {
+    reset({ targetKeys: [] });
+    clearImage();
+    setSubmitError(null);
   }
 
   const allSelected =
@@ -378,10 +395,23 @@ export function ReportForm({ username }: { username: string }) {
               ) : (
                 <label
                   htmlFor="image"
-                  className="flex cursor-pointer items-center gap-2.5 rounded-lg border border-dashed border-hairline-strong px-3 py-3 text-[13px] text-ink-muted-48 transition-colors hover:border-primary-focus hover:text-ink-muted-80"
+                  onDragOver={(e) => {
+                    e.preventDefault();
+                    setDragOver(true);
+                  }}
+                  onDragLeave={() => setDragOver(false)}
+                  onDrop={handleDrop}
+                  className={cn(
+                    "flex cursor-pointer items-center gap-2.5 rounded-lg border border-dashed px-3 py-3 text-[13px] transition-colors",
+                    dragOver
+                      ? "border-primary bg-[#F2F4FC] text-ink-muted-80"
+                      : "border-hairline-strong text-ink-muted-48 hover:border-primary-focus hover:text-ink-muted-80"
+                  )}
                 >
                   <ImagePlus className="size-4 shrink-0" />
-                  Pilih file, atau tempel screenshot dengan Ctrl+V
+                  {dragOver
+                    ? "Lepaskan gambar di sini"
+                    : "Pilih file, seret ke sini, atau tempel dengan Ctrl+V"}
                 </label>
               )}
 
@@ -402,21 +432,34 @@ export function ReportForm({ username }: { username: string }) {
 
             <FieldError message={submitError ?? undefined} />
 
-            <div className="flex flex-wrap items-center justify-between gap-3 border-t border-hairline pt-5">
+            {/* Sticky so the send button stays reachable on a long form
+                without scrolling to the bottom first. -mx/-mb pull it to
+                the card's edges; the matching px/pb restore the inset. */}
+            <div className="sticky bottom-0 -mx-5 -mb-5 flex flex-wrap items-center justify-between gap-3 border-t border-hairline bg-canvas px-5 pb-5 pt-4 sm:-mx-6 sm:-mb-6 sm:px-6 sm:pb-6">
               <Checkbox
                 id="skip-preview"
                 label="Jangan tampilkan konfirmasi lagi"
                 checked={skipPreview}
                 onChange={(e) => updateSkipPreview(e.target.checked)}
               />
-              <Button type="submit" size="lg" disabled={submitting}>
-                {submitting ? <Spinner /> : <Send />}
-                {submitting
-                  ? "Mengirim..."
-                  : skipPreview
-                    ? "Kirim ke Telegram"
-                    : "Periksa & Kirim"}
-              </Button>
+              <div className="flex items-center gap-2">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  onClick={resetForm}
+                  disabled={submitting}
+                >
+                  Kosongkan
+                </Button>
+                <Button type="submit" size="lg" loading={submitting}>
+                  {!submitting && <Send />}
+                  {submitting
+                    ? "Mengirim..."
+                    : skipPreview
+                      ? "Kirim ke Telegram"
+                      : "Periksa & Kirim"}
+                </Button>
+              </div>
             </div>
           </form>
         </Card>
@@ -429,7 +472,8 @@ export function ReportForm({ username }: { username: string }) {
           submittedBy={username}
           targetLabels={selectedTargetLabels}
           imagePreviewUrl={imagePreviewUrl}
-          className="lg:sticky lg:top-6"
+          onRemoveImage={clearImage}
+          className="self-start lg:sticky lg:top-6"
         />
       </div>
 

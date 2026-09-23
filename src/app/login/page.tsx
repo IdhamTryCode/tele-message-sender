@@ -7,7 +7,6 @@ import Image from "next/image";
 import { ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Spinner } from "@/components/ui/spinner";
 import { Label, FieldError } from "@/components/ui/card";
 import { OtpInput } from "@/components/ui/otp-input";
 import { AuthShowcase } from "@/components/auth-showcase";
@@ -72,9 +71,9 @@ export default function LoginPage() {
           <Image
             src="/bankjateng.png"
             alt="Bank Jateng"
-            width={1024}
-            height={379}
-            className="h-8 w-auto"
+            width={1280}
+            height={591}
+            className="h-11 w-auto"
             priority
           />
           <h1 className="mt-6 text-[30px] font-semibold tracking-tight text-ink">
@@ -128,9 +127,9 @@ export default function LoginPage() {
               type="submit"
               size="lg"
               className="w-full"
-              disabled={submitting || !mounted}
+              loading={submitting}
+              disabled={!mounted}
             >
-              {submitting ? <Spinner /> : null}
               {submitting ? "Memverifikasi..." : "Masuk"}
               {!submitting && <ArrowRight />}
             </Button>

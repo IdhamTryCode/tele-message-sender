@@ -3,7 +3,6 @@
 import { useState } from "react";
 import { QrCode } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Spinner } from "@/components/ui/spinner";
 import { Label, FieldError } from "@/components/ui/card";
 import { OtpInput } from "@/components/ui/otp-input";
 
@@ -112,8 +111,7 @@ export function TotpSetupStep({
           />
         </div>
         <FieldError message={error ?? undefined} />
-        <Button type="submit" size="lg" className="w-full" disabled={submitting}>
-          {submitting && <Spinner />}
+        <Button type="submit" size="lg" className="w-full" loading={submitting}>
           {submitting ? "Memverifikasi..." : "Konfirmasi & Masuk"}
         </Button>
       </form>

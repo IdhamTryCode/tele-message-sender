@@ -3,12 +3,13 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import type { InferSelectModel } from "drizzle-orm";
-import { ChevronRight, Plus, Search } from "lucide-react";
+import { ChevronLeft, ChevronRight, Plus, Search } from "lucide-react";
 import type { reports } from "@/lib/db/schema";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { ReportDetailDialog } from "@/components/report-detail-dialog";
+import { formatTanggal, formatTimestamp } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
 type Report = InferSelectModel<typeof reports>;
@@ -24,6 +25,8 @@ const STATUS_VARIANT: Record<string, "success" | "danger" | "warning"> = {
   failed: "danger",
   partial: "warning",
 };
+
+const PAGE_SIZE = 20;
 
 type Filter = "all" | "sent" | "failed";
 
@@ -47,16 +50,6 @@ function parseTargetErrors(raw: string | null): Record<string, string> {
   }
 }
 
-function formatTanggal(value: string): string {
-  const date = new Date(`${value}T00:00:00`);
-  if (Number.isNaN(date.getTime())) return value;
-  return date.toLocaleDateString("id-ID", {
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-  });
-}
-
 export function HistoryTable({
   reports,
   targetLabels,
@@ -67,6 +60,7 @@ export function HistoryTable({
   const [detailReport, setDetailReport] = useState<Report | null>(null);
   const [filter, setFilter] = useState<Filter>("all");
   const [query, setQuery] = useState("");
+  const [page, setPage] = useState(1);
 
   const counts = useMemo(
     () => ({
@@ -94,6 +88,25 @@ export function HistoryTable({
       );
     });
   }, [reports, filter, query, targetLabels]);
+
+  const pageCount = Math.max(1, Math.ceil(visible.length / PAGE_SIZE));
+  // Clamped during render rather than corrected in an effect: if the row
+  // count shrinks out from under the current page (a report removed
+  // server-side, say), this shows the last valid page immediately instead
+  // of rendering an empty one and then re-rendering.
+  const currentPage = Math.min(page, pageCount);
+  const start = (currentPage - 1) * PAGE_SIZE;
+  const pageRows = visible.slice(start, start + PAGE_SIZE);
+
+  function applyFilter(next: Filter) {
+    setFilter(next);
+    setPage(1);
+  }
+
+  function applyQuery(next: string) {
+    setQuery(next);
+    setPage(1);
+  }
 
   if (reports.length === 0) {
     return (
@@ -124,7 +137,7 @@ export function HistoryTable({
           {TABS.map((tab) => (
             <button
               key={tab.key}
-              onClick={() => setFilter(tab.key)}
+              onClick={() => applyFilter(tab.key)}
               className={cn(
                 "flex items-center gap-1.5 rounded px-3 py-1.5 text-[13px] transition-colors",
                 filter === tab.key
@@ -144,7 +157,7 @@ export function HistoryTable({
           <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-ink-faint" />
           <Input
             value={query}
-            onChange={(e) => setQuery(e.target.value)}
+            onChange={(e) => applyQuery(e.target.value)}
             placeholder="Cari judul atau target"
             aria-label="Cari laporan"
             className="pl-9"
@@ -152,10 +165,19 @@ export function HistoryTable({
         </div>
       </div>
 
-      <div className="overflow-hidden rounded-lg border border-hairline bg-canvas">
-        <div className="overflow-x-auto">
+      {/* No overflow-hidden here: a scroll container between the viewport
+          and the sticky <thead> would cancel the stickiness. The rounded
+          corners are applied to the table's own first/last rows instead. */}
+      <div className="rounded-lg border border-hairline bg-canvas">
+        {/* Horizontal scrolling only where the table can't fit. On lg+ the
+            container must NOT scroll, or it becomes the sticky header's
+            scroll root and the header stops sticking to the viewport. */}
+        <div className="overflow-x-auto rounded-lg lg:overflow-x-visible">
           <table className="w-full min-w-[720px] text-[14px]">
-            <thead>
+            {/* Header sticks below the mobile top bar (which is ~88px tall:
+                brand row + nav row); on lg the sidebar is fixed and there
+                is no top bar, so it sticks to the viewport top. */}
+            <thead className="sticky top-[88px] z-10 bg-canvas-subtle lg:top-0">
               <tr className="border-b border-hairline text-left">
                 {["Judul", "Tanggal", "Target", "Status", "Dikirim"].map(
                   (h) => (
@@ -171,7 +193,7 @@ export function HistoryTable({
               </tr>
             </thead>
             <tbody>
-              {visible.map((r) => {
+              {pageRows.map((r) => {
                 const keys = parseTargetKeys(r.targetKeys);
                 const errors = parseTargetErrors(r.targetErrors);
                 const errorCount = Object.keys(errors).length;
@@ -182,7 +204,10 @@ export function HistoryTable({
                     className="cursor-pointer border-b border-hairline transition-colors last:border-0 hover:bg-canvas-subtle"
                   >
                     <td className="max-w-[260px] px-4 py-3">
-                      <span className="block truncate font-medium text-ink">
+                      <span
+                        title={r.judul}
+                        className="block truncate font-medium text-ink"
+                      >
                         {r.judul}
                       </span>
                     </td>
@@ -212,13 +237,7 @@ export function HistoryTable({
                       )}
                     </td>
                     <td className="tabular whitespace-nowrap px-4 py-3 text-[13px] text-ink-muted-48">
-                      {new Date(r.createdAt).toLocaleString("id-ID", {
-                        day: "2-digit",
-                        month: "short",
-                        year: "numeric",
-                        hour: "2-digit",
-                        minute: "2-digit",
-                      })}
+                      {formatTimestamp(r.createdAt)}
                     </td>
                     <td className="px-4 py-3">
                       <ChevronRight className="size-4 text-ink-faint" />
@@ -234,6 +253,35 @@ export function HistoryTable({
           <p className="px-4 py-10 text-center text-[14px] text-ink-muted-48">
             Tidak ada laporan yang cocok dengan filter ini.
           </p>
+        )}
+
+        {visible.length > 0 && (
+          <div className="flex flex-wrap items-center justify-between gap-3 border-t border-hairline px-4 py-3">
+            <span className="tabular text-[13px] text-ink-muted-48">
+              Menampilkan {start + 1}–{Math.min(start + PAGE_SIZE, visible.length)}{" "}
+              dari {visible.length}
+            </span>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => setPage(currentPage - 1)}
+                disabled={currentPage === 1}
+              >
+                <ChevronLeft />
+                Sebelumnya
+              </Button>
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => setPage(currentPage + 1)}
+                disabled={currentPage >= pageCount}
+              >
+                Berikutnya
+                <ChevronRight />
+              </Button>
+            </div>
+          </div>
         )}
       </div>
 

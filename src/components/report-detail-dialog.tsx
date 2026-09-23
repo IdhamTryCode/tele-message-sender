@@ -6,6 +6,7 @@ import { ImageOff, X } from "lucide-react";
 import type { reports } from "@/lib/db/schema";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
+import { formatTanggal, formatTimestamp } from "@/lib/format";
 
 type Report = InferSelectModel<typeof reports>;
 
@@ -68,13 +69,7 @@ export function ReportDetailDialog({
               {report.judul}
             </h2>
             <p className="tabular mt-1 text-[13px] text-ink-muted-48">
-              {new Date(report.createdAt).toLocaleString("id-ID", {
-                day: "2-digit",
-                month: "long",
-                year: "numeric",
-                hour: "2-digit",
-                minute: "2-digit",
-              })}
+              {formatTimestamp(report.createdAt)}
             </p>
           </div>
           <button
@@ -120,7 +115,7 @@ export function ReportDetailDialog({
             <p className="text-[12px] font-semibold uppercase tracking-wider text-ink-faint">
               Tanggal kejadian
             </p>
-            <p className="mt-1 text-ink">{report.tanggal}</p>
+            <p className="mt-1 text-ink">{formatTanggal(report.tanggal)}</p>
           </div>
 
           <div>

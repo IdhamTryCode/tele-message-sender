@@ -14,10 +14,13 @@ export const metadata: Metadata = {
   description: "Kirim laporan insiden ke Telegram",
 };
 
+// No height constraint or overflow rule on html/body: the page itself is
+// the scroll container, which is what lets `position: sticky` work for the
+// sidebar's siblings (the /form preview column, the /history table header).
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
-    <html lang="id" className={`${inter.variable} h-full antialiased`}>
-      <body className="min-h-full flex flex-col">{children}</body>
+    <html lang="id" className={`${inter.variable} antialiased`}>
+      <body className="min-h-dvh">{children}</body>
     </html>
   );
 }
