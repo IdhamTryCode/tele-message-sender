@@ -14,12 +14,15 @@ const STATUS_LABEL: Record<string, string> = {
   sent: "Terkirim",
   failed: "Gagal",
   partial: "Sebagian gagal",
+  // Written before sending and never finalised: the outcome is unknown.
+  pending: "Tidak tercatat selesai",
 };
 
 const STATUS_VARIANT: Record<string, "success" | "danger" | "warning"> = {
   sent: "success",
   failed: "danger",
   partial: "warning",
+  pending: "warning",
 };
 
 interface Props {

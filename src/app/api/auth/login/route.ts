@@ -14,16 +14,24 @@ const loginSchema = z.object({
   code: z.string().regex(/^\d{6}$/),
 });
 
-const GENERIC_ERROR = NextResponse.json(
-  { error: "Username atau kode tidak valid" },
-  { status: 401 }
-);
+const DAILY_LOGIN_ATTEMPTS = 20;
+
+// A function, not a shared constant: a Response body can be read only
+// once, so one module-level instance answered the first failure correctly
+// and every later one with an empty body — which the client then showed
+// as its own fallback text instead of this message.
+function genericError() {
+  return NextResponse.json(
+    { error: "Username atau kode tidak valid" },
+    { status: 401 }
+  );
+}
 
 export const POST = withErrorHandling(async (request: Request) => {
   const body = await request.json().catch(() => null);
   const parsed = loginSchema.safeParse(body);
   if (!parsed.success) {
-    return GENERIC_ERROR;
+    return genericError();
   }
   const { username, code } = parsed.data;
 
@@ -38,6 +46,31 @@ export const POST = withErrorHandling(async (request: Request) => {
     );
   }
 
+  // The 15-minute limit alone still allows 480 guesses a day. A TOTP code
+  // is the only credential here and three codes are valid at any moment
+  // (±30s tolerance), so that works out to roughly a 40% chance per year
+  // of guessing into one account. The daily cap cuts it to about 2%.
+  // Checked second so a request already refused above doesn't spend it.
+  // The price is that 20 bad guesses lock the account until the next UTC
+  // day — scripts/unlock-user.ts is the way out.
+  const daily = await checkRateLimit(
+    `login-day:${username}`,
+    DAILY_LOGIN_ATTEMPTS,
+    24 * 60 * 60
+  );
+  if (!daily.allowed) {
+    console.warn(
+      `Daily login cap reached for ${JSON.stringify(username)} — possible code guessing.`
+    );
+    return NextResponse.json(
+      {
+        error:
+          "Akun dikunci sementara karena terlalu banyak percobaan login hari ini. Hubungi admin.",
+      },
+      { status: 429 }
+    );
+  }
+
   const [user] = await db
     .select()
     .from(users)
@@ -48,19 +81,19 @@ export const POST = withErrorHandling(async (request: Request) => {
   // finished TOTP setup yet, or the code is wrong — avoids leaking which
   // usernames are registered or their setup state.
   if (!user || user.totpSecretEncrypted === null) {
-    return GENERIC_ERROR;
+    return genericError();
   }
 
   let secret: string;
   try {
     secret = decryptSecret(user.totpSecretEncrypted);
   } catch {
-    return GENERIC_ERROR;
+    return genericError();
   }
 
   const isValid = await verifyTotpCode(username, secret, code);
   if (!isValid) {
-    return GENERIC_ERROR;
+    return genericError();
   }
 
   // First successful login confirms setup permanently. In practice this
@@ -75,6 +108,6 @@ export const POST = withErrorHandling(async (request: Request) => {
       .where(eq(users.username, username));
   }
 
-  await createSession(username);
+  await createSession({ id: user.id, username: user.username });
   return NextResponse.json({ ok: true });
 });

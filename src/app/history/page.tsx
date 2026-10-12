@@ -1,9 +1,11 @@
 import Link from "next/link";
-import { desc, eq } from "drizzle-orm";
+import { desc } from "drizzle-orm";
+import { redirect } from "next/navigation";
 import { Plus } from "lucide-react";
 import { getSession } from "@/lib/auth/session";
 import { db } from "@/lib/db";
 import { reports } from "@/lib/db/schema";
+import { ownReports } from "@/lib/reports";
 import { getPublicTargets } from "@/lib/targets";
 import { HistoryTable } from "@/components/history-table";
 import { AppShell } from "@/components/app-shell";
@@ -12,24 +14,20 @@ import { SubmitNotice } from "@/components/submit-notice";
 import { Button } from "@/components/ui/button";
 
 export default async function HistoryPage() {
+  // See src/app/form/page.tsx for why this redirect exists alongside proxy.ts.
   const session = await getSession();
+  if (!session) redirect("/login");
 
-  // Defense in depth: proxy already redirects unauthenticated visits, but
-  // this route re-derives the session itself rather than trusting proxy
-  // (see src/proxy.ts for why). session is guaranteed non-null in practice
-  // here since proxy protects this path, but we still scope the query to
-  // the current user only — never all users' reports.
-  const rows = session
-    ? await db
-        .select()
-        .from(reports)
-        .where(eq(reports.submittedBy, session.username))
-        .orderBy(desc(reports.createdAt))
-        .limit(100)
-    : [];
+  // Scoped to the current user only — never all users' reports.
+  const rows = await db
+    .select()
+    .from(reports)
+    .where(ownReports(session))
+    .orderBy(desc(reports.createdAt))
+    .limit(100);
 
   return (
-    <AppShell username={session?.username} reportCount={rows.length}>
+    <AppShell username={session.username} reportCount={rows.length}>
       <main className="mx-auto max-w-5xl px-4 py-8 sm:px-6 lg:py-10">
         <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
           <div>

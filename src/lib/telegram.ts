@@ -12,6 +12,7 @@
  */
 
 const TELEGRAM_API_BASE = "https://api.telegram.org";
+const REQUEST_TIMEOUT_MS = 15_000;
 
 function getBotToken(): string {
   const token = process.env.TELEGRAM_BOT_TOKEN;
@@ -71,10 +72,27 @@ async function callTelegramApi(
   body: FormData
 ): Promise<void> {
   const token = getBotToken();
-  const res = await fetch(`${TELEGRAM_API_BASE}/bot${token}/${method}`, {
-    method: "POST",
-    body,
-  });
+
+  // A request that never reaches Telegram (DNS, reset, timeout) is reported
+  // as a failed target like any other, so the caller records it and moves
+  // on to the next target instead of aborting with the audit row unfinished.
+  // Only the error's name is logged: the request URL embeds the bot token.
+  let res: Response;
+  try {
+    res = await fetch(`${TELEGRAM_API_BASE}/bot${token}/${method}`, {
+      method: "POST",
+      body,
+      signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+    });
+  } catch (err) {
+    const name = err instanceof Error ? err.name : "unknown";
+    console.error(`Telegram API ${method} did not complete (${name})`);
+    throw new TelegramSendError(
+      `Telegram API request did not complete (${method})`,
+      undefined,
+      "Tidak dapat menghubungi Telegram. Coba lagi sebentar."
+    );
+  }
 
   if (!res.ok) {
     // Don't leak Telegram's raw response body to callers/clients — log it

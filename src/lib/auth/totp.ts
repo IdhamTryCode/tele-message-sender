@@ -1,7 +1,7 @@
 import { TOTP } from "@otplib/totp";
 import { NobleCryptoPlugin } from "@otplib/plugin-crypto-noble";
 import { ScureBase32Plugin } from "@otplib/plugin-base32-scure";
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { totpReplay } from "@/lib/db/schema";
 
@@ -57,14 +57,19 @@ export async function verifyTotpCode(
   }
 
   // Record this time step so the same code (or any code from this or an
-  // earlier step) can't be replayed.
-  await db
+  // earlier step) can't be replayed. The write only goes through if it
+  // moves the step forward, and its outcome — not the read above — is what
+  // decides: two concurrent requests with the same code both pass verify(),
+  // but only one of them advances the row, so only one logs in.
+  const advanced = await db
     .insert(totpReplay)
     .values({ username, lastUsedStep: result.timeStep })
     .onConflictDoUpdate({
       target: totpReplay.username,
       set: { lastUsedStep: result.timeStep },
-    });
+      setWhere: sql`${totpReplay.lastUsedStep} < ${result.timeStep}`,
+    })
+    .returning({ username: totpReplay.username });
 
-  return true;
+  return advanced.length === 1;
 }

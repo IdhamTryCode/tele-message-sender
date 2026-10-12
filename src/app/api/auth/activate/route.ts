@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { eq } from "drizzle-orm";
+import { and, eq, gt, isNull } from "drizzle-orm";
 import { z } from "zod";
 import qrcode from "qrcode";
 import { db } from "@/lib/db";
@@ -22,13 +22,20 @@ const activateSchema = z.object({
 // didn't finish scanning before navigating away lands here on retry, and
 // the fix (ask the admin for a new code) is the same regardless of which
 // underlying reason applies.
-const GENERIC_ERROR = NextResponse.json(
-  {
-    error:
-      "Username atau kode aktivasi tidak valid, sudah pernah dipakai, atau kedaluwarsa. Hubungi admin untuk kode aktivasi baru.",
-  },
-  { status: 401 }
-);
+//
+// A function, not a shared constant: a Response body can be read only
+// once, so one module-level instance answered the first failure correctly
+// and every later one with an empty body — which the client then showed
+// as its own fallback text instead of this message.
+function genericError() {
+  return NextResponse.json(
+    {
+      error:
+        "Username atau kode aktivasi tidak valid, sudah pernah dipakai, atau kedaluwarsa. Hubungi admin untuk kode aktivasi baru.",
+    },
+    { status: 401 }
+  );
+}
 
 /**
  * Consumes a one-time activation code (issued by scripts/seed-user.ts or
@@ -42,7 +49,7 @@ export const POST = withErrorHandling(async (request: Request) => {
   const body = await request.json().catch(() => null);
   const parsed = activateSchema.safeParse(body);
   if (!parsed.success) {
-    return GENERIC_ERROR;
+    return genericError();
   }
   const { username, code } = parsed.data;
 
@@ -65,7 +72,7 @@ export const POST = withErrorHandling(async (request: Request) => {
     .limit(1);
 
   if (!user) {
-    return GENERIC_ERROR;
+    return genericError();
   }
 
   // Deliberate exception to "never reveal account state": someone who's
@@ -80,27 +87,31 @@ export const POST = withErrorHandling(async (request: Request) => {
     );
   }
 
-  const codeValid =
-    user.activationCode !== null &&
-    user.activationCode === code &&
-    user.activationCodeExpiresAt !== null &&
-    user.activationCodeExpiresAt.getTime() > Date.now();
-
-  if (!codeValid) {
-    return GENERIC_ERROR;
-  }
-
+  // The code is checked and consumed in one UPDATE rather than compared
+  // here and cleared afterwards: with a read-then-write, two requests
+  // carrying the same valid code could both pass the check and each walk
+  // away with a QR. Now only the request whose UPDATE matches a row wins.
   const secret = generateTotpSecret();
-  await db
+  const consumed = await db
     .update(users)
     .set({
       totpSecretEncrypted: encryptSecret(secret),
-      // One-time use: clear immediately so this exact code can never be
-      // replayed, even if the same (correct) code is submitted again.
       activationCode: null,
       activationCodeExpiresAt: null,
     })
-    .where(eq(users.username, username));
+    .where(
+      and(
+        eq(users.id, user.id),
+        eq(users.activationCode, code),
+        gt(users.activationCodeExpiresAt, new Date()),
+        isNull(users.totpConfirmedAt)
+      )
+    )
+    .returning({ id: users.id });
+
+  if (consumed.length === 0) {
+    return genericError();
+  }
 
   const uri = buildTotpUri(secret, username);
   const qrDataUrl = await qrcode.toDataURL(uri);

@@ -1,5 +1,8 @@
 import { SignJWT, jwtVerify } from "jose";
 import { cookies } from "next/headers";
+import { eq } from "drizzle-orm";
+import { db } from "@/lib/db";
+import { users } from "@/lib/db/schema";
 
 /**
  * Session cookie: a signed (not encrypted) JWT. Signed is sufficient here
@@ -21,10 +24,20 @@ function getSecretKey(): Uint8Array {
 
 export interface SessionPayload {
   username: string;
+  userId: number;
+  /**
+   * When this user row was created. Reports are keyed by username text, so
+   * history queries bound themselves to this to keep a re-created username
+   * from inheriting the reports of whoever held the name before.
+   */
+  userCreatedAt: Date;
 }
 
-export async function createSession(username: string): Promise<void> {
-  const token = await new SignJWT({ username })
+export async function createSession(user: {
+  id: number;
+  username: string;
+}): Promise<void> {
+  const token = await new SignJWT({ username: user.username, uid: user.id })
     .setProtectedHeader({ alg: "HS256" })
     .setIssuedAt()
     .setExpirationTime(`${SESSION_DURATION_SECONDS}s`)
@@ -52,18 +65,51 @@ export async function destroySession(): Promise<void> {
   cookieStore.delete(COOKIE_NAME);
 }
 
-/** Reads and verifies the session cookie. Returns null if absent/invalid/expired. */
+/**
+ * Reads and verifies the session cookie. Returns null if absent, invalid,
+ * expired, or no longer backed by an active user.
+ *
+ * A valid signature alone is not enough: the token is re-checked against
+ * the users table on every call, by row id. Without that, deleting a user
+ * left their cookie working for up to 8 hours, and — because the id is
+ * what's matched, not the name — a token minted for a deleted user can't
+ * come back to life when the same username is registered again.
+ */
 export async function getSession(): Promise<SessionPayload | null> {
   const cookieStore = await cookies();
   const token = cookieStore.get(COOKIE_NAME)?.value;
   if (!token) return null;
 
+  let username: string;
+  let userId: number;
   try {
-    const { payload } = await jwtVerify(token, getSecretKey());
+    const { payload } = await jwtVerify(token, getSecretKey(), {
+      algorithms: ["HS256"],
+    });
     if (typeof payload.username !== "string") return null;
-    return { username: payload.username };
+    if (typeof payload.uid !== "number") return null;
+    username = payload.username;
+    userId = payload.uid;
   } catch {
     // Invalid signature, malformed token, or expired — all treated as "no session".
     return null;
   }
+
+  // Outside the try on purpose: a database failure should surface as an
+  // error, not be mistaken for "not logged in".
+  const [user] = await db
+    .select({
+      username: users.username,
+      totpConfirmedAt: users.totpConfirmedAt,
+      createdAt: users.createdAt,
+    })
+    .from(users)
+    .where(eq(users.id, userId))
+    .limit(1);
+
+  if (!user || user.username !== username || user.totpConfirmedAt === null) {
+    return null;
+  }
+
+  return { username, userId, userCreatedAt: user.createdAt };
 }

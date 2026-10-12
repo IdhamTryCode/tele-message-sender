@@ -346,6 +346,20 @@ tanpa memahami konsekuensinya:
   tidak tersimpan di log atau tempat lain setelah request selesai. Cukup
   diterima selama asumsi "user pakai device pribadi saat setup" berlaku.
 
+- **[RISIKO DITERIMA — SEDANG] Kode TOTP adalah satu-satunya kredensial,
+  jadi bisa ditebak pelan-pelan.** Kode 6 digit dengan toleransi ±30 detik
+  berarti 3 kode valid sekaligus. Dengan batas 5 percobaan per 15 menit
+  saja, penebak yang gigih punya peluang sekitar 40% per tahun untuk
+  menembus satu akun. Batas harian 20 percobaan per username (lihat
+  `src/app/api/auth/login/route.ts`) menurunkannya ke sekitar 2% per
+  tahun. **Harga yang dibayar:** siapa pun yang tahu sebuah username bisa
+  sengaja mengunci akun itu sampai pergantian hari (UTC) dengan 20
+  percobaan salah — admin membukanya dengan `npm run unlock:user --
+  <username>`. **Kapan wajib direvisit:** kalau jumlah user bertambah
+  banyak atau penguncian mulai disalahgunakan — perbaikan sebenarnya
+  adalah faktor kedua (PIN/password, atau SSO), bukan batas yang lebih
+  ketat.
+
 > **Catatan untuk tim/atasan:** Telegram bukan medium terenkripsi
 > end-to-end untuk grup — isi pesan tersimpan di server Telegram, di luar
 > kendali organisasi. Untuk laporan tingkat operasional saat ini dinilai

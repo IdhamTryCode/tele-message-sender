@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { desc, eq } from "drizzle-orm";
 import { getSession } from "@/lib/auth/session";
+import { ownReports } from "@/lib/reports";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { reportSchema } from "@/lib/validation/report";
 import { resolveTargetChatId, getPublicTargets } from "@/lib/targets";
@@ -26,7 +27,7 @@ export const GET = withErrorHandling(async () => {
   const rows = await db
     .select()
     .from(reports)
-    .where(eq(reports.submittedBy, session.username))
+    .where(ownReports(session))
     .orderBy(desc(reports.createdAt))
     .limit(100);
 
@@ -133,6 +134,26 @@ export const POST = withErrorHandling(async (request: Request) => {
     );
   }
 
+  // The audit row is written BEFORE anything is sent and finalised after.
+  // Writing it only at the end meant a failure between the two (a dropped
+  // database connection, a timeout) left messages in Telegram with no
+  // record of them — and a user who then retried sent everything twice.
+  // A row still marked "pending" now means exactly that: a send was
+  // started and its outcome was never recorded.
+  const [auditRow] = await db
+    .insert(reports)
+    .values({
+      judul,
+      tanggal,
+      deskripsi,
+      mitigasi,
+      hasImage: sanitizedImage !== null,
+      targetKeys: JSON.stringify(targetKeys),
+      submittedBy: session.username,
+      status: "pending",
+    })
+    .returning({ id: reports.id });
+
   // Sent sequentially (not Promise.all) — keeps Telegram rate-limit
   // behavior predictable and per-target error attribution simple at this
   // scale (2 targets today).
@@ -187,19 +208,15 @@ export const POST = withErrorHandling(async (request: Request) => {
         ? "failed"
         : "partial";
 
-  await db.insert(reports).values({
-    judul,
-    tanggal,
-    deskripsi,
-    mitigasi,
-    hasImage: sanitizedImage !== null,
-    targetKeys: JSON.stringify(targetKeys),
-    targetErrors: Object.keys(targetErrors).length
-      ? JSON.stringify(targetErrors)
-      : null,
-    submittedBy: session.username,
-    status,
-  });
+  await db
+    .update(reports)
+    .set({
+      status,
+      targetErrors: Object.keys(targetErrors).length
+        ? JSON.stringify(targetErrors)
+        : null,
+    })
+    .where(eq(reports.id, auditRow.id));
 
   if (status === "failed") {
     const detail = Object.values(targetErrors)[0];
