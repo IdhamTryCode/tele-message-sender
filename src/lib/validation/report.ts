@@ -15,6 +15,9 @@ function maxAllowedDate(): string {
   return d.toISOString().slice(0, 10);
 }
 
+const JUDUL_FORBIDDEN =
+  /[\p{Cc}\u2028\u2029\u061C\u200E\u200F\u202A-\u202E\u2066-\u2069]/u;
+
 /**
  * Source of truth for report field validation. Used both client-side (via
  * @hookform/resolvers/zod, for instant UX feedback) and server-side in the
@@ -26,14 +29,17 @@ export const reportSchema = z.object({
   // above "Tanggal:" and "Dikirim oleh:", so a title carrying a line break
   // (e.g. via the API, which the single-line browser input doesn't stop)
   // would forge extra header lines above the real sender. Reject any control
-  // character (Cc covers \n, \r, \t) or line/paragraph separator.
+  // character (Cc covers \n, \r, \t) or line/paragraph separator \u2014 and the
+  // bidirectional controls, which can't add a line but can visually reorder
+  // the one the title sits on. Other format characters are left alone on
+  // purpose: the zero-width joiner is what holds compound emoji together.
   judul: z
     .string()
     .trim()
     .min(3, "Judul minimal 3 karakter")
     .max(200, "Judul maksimal 200 karakter")
-    .refine((val) => !/[\p{Cc}\u2028\u2029]/u.test(val), {
-      message: "Judul tidak boleh mengandung karakter baris baru",
+    .refine((val) => !JUDUL_FORBIDDEN.test(val), {
+      message: "Judul tidak boleh mengandung baris baru atau karakter kontrol",
     }),
   tanggal: z
     .string()

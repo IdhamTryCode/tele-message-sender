@@ -234,15 +234,29 @@ export const POST = withErrorHandling(async (request: Request) => {
           ? "failed"
           : "partial";
 
-  await db
-    .update(reports)
-    .set({
-      status,
-      targetErrors: Object.keys(targetErrors).length
-        ? JSON.stringify(targetErrors)
-        : null,
-    })
-    .where(eq(reports.id, auditRow.id));
+  // By now the sends have happened, so a failure to record them must not
+  // turn into an error response: the user would retry and post everything
+  // again. One retry, then carry on and answer truthfully — the row stays
+  // "pending", which is exactly what that status means.
+  for (let attempt = 1; attempt <= 2; attempt++) {
+    try {
+      await db
+        .update(reports)
+        .set({
+          status,
+          targetErrors: Object.keys(targetErrors).length
+            ? JSON.stringify(targetErrors)
+            : null,
+        })
+        .where(eq(reports.id, auditRow.id));
+      break;
+    } catch (err) {
+      console.error(
+        `Could not record outcome "${status}" for report ${auditRow.id} (attempt ${attempt}):`,
+        err instanceof Error ? err.message : err
+      );
+    }
+  }
 
   if (status === "failed") {
     const detail = Object.values(targetErrors)[0];

@@ -217,7 +217,14 @@ export function ReportForm({ username }: { username: string }) {
       const data = await res.json().catch(() => ({}));
 
       if (!res.ok) {
-        setSubmitError(data.error ?? "Gagal mengirim laporan.");
+        // An expired session is explained here rather than redirected:
+        // sending the user to /login would throw away a report they may
+        // have spent several minutes writing.
+        setSubmitError(
+          res.status === 401
+            ? "Sesi Anda sudah berakhir. Login ulang di tab lain, lalu kirim kembali dari sini — isi form tidak hilang."
+            : (data.error ?? "Gagal mengirim laporan.")
+        );
         setShowPreview(false);
         return;
       }
