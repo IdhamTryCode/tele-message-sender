@@ -16,6 +16,8 @@ const STATUS_LABEL: Record<string, string> = {
   partial: "Sebagian gagal",
   // Written before sending and never finalised: the outcome is unknown.
   pending: "Tidak tercatat selesai",
+  // No answer from Telegram for at least one target: it may have arrived.
+  uncertain: "Tidak pasti terkirim",
 };
 
 const STATUS_VARIANT: Record<string, "success" | "danger" | "warning"> = {
@@ -23,6 +25,7 @@ const STATUS_VARIANT: Record<string, "success" | "danger" | "warning"> = {
   failed: "danger",
   partial: "warning",
   pending: "warning",
+  uncertain: "warning",
 };
 
 interface Props {

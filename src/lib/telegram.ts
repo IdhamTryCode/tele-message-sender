@@ -12,7 +12,7 @@
  */
 
 const TELEGRAM_API_BASE = "https://api.telegram.org";
-const REQUEST_TIMEOUT_MS = 15_000;
+export const TELEGRAM_REQUEST_TIMEOUT_MS = 15_000;
 
 function getBotToken(): string {
   const token = process.env.TELEGRAM_BOT_TOKEN;
@@ -31,7 +31,13 @@ export class TelegramSendError extends Error {
      * from a fixed set of known categories, never the raw Telegram
      * `description` (which we haven't audited for what it might contain).
      */
-    public readonly translatedMessage: string = "Terjadi kesalahan saat mengirim ke Telegram."
+    public readonly translatedMessage: string = "Terjadi kesalahan saat mengirim ke Telegram.",
+    /**
+     * True when no answer came back, so the message may or may not have
+     * been delivered. Callers must not present this as a plain failure:
+     * telling the user to "try again" is how one report gets posted twice.
+     */
+    public readonly outcomeUnknown: boolean = false
   ) {
     super(message);
     this.name = "TelegramSendError";
@@ -71,18 +77,31 @@ async function callTelegramApi(
   method: string,
   body: FormData
 ): Promise<void> {
-  const token = getBotToken();
+  // A missing token is a definite "nothing was sent", and is reported per
+  // target like any other failure so the caller still finalises its audit row.
+  let token: string;
+  try {
+    token = getBotToken();
+  } catch {
+    console.error("TELEGRAM_BOT_TOKEN is not set");
+    throw new TelegramSendError(
+      "Telegram bot token is not configured",
+      undefined,
+      "Bot Telegram belum dikonfigurasi di server. Hubungi admin."
+    );
+  }
 
-  // A request that never reaches Telegram (DNS, reset, timeout) is reported
-  // as a failed target like any other, so the caller records it and moves
-  // on to the next target instead of aborting with the audit row unfinished.
+  // A request that gets no answer (timeout, connection reset) is NOT a
+  // known failure: Telegram may have accepted the upload and posted the
+  // message before the response was lost. It is surfaced as outcomeUnknown
+  // so the caller can say "check the group" instead of "try again".
   // Only the error's name is logged: the request URL embeds the bot token.
   let res: Response;
   try {
     res = await fetch(`${TELEGRAM_API_BASE}/bot${token}/${method}`, {
       method: "POST",
       body,
-      signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+      signal: AbortSignal.timeout(TELEGRAM_REQUEST_TIMEOUT_MS),
     });
   } catch (err) {
     const name = err instanceof Error ? err.name : "unknown";
@@ -90,7 +109,8 @@ async function callTelegramApi(
     throw new TelegramSendError(
       `Telegram API request did not complete (${method})`,
       undefined,
-      "Tidak dapat menghubungi Telegram. Coba lagi sebentar."
+      "Tidak ada jawaban dari Telegram — pesan mungkin sudah terkirim. Periksa chat ini sebelum mengirim ulang.",
+      true
     );
   }
 

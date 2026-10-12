@@ -13,10 +13,18 @@ import {
   sendTelegramMessage,
   sendTelegramPhoto,
   TelegramSendError,
+  TELEGRAM_REQUEST_TIMEOUT_MS,
 } from "@/lib/telegram";
 import { db } from "@/lib/db";
 import { reports } from "@/lib/db/schema";
 import { withErrorHandling } from "@/lib/api-handler";
+
+// The send loop is sequential and each target can take two Telegram calls
+// (photo, then the full text), so the platform limit is set explicitly and
+// the loop budgets itself underneath it, leaving room to write the result.
+export const maxDuration = 60;
+const SEND_BUDGET_MS = 50_000;
+const WORST_CASE_TARGET_MS = 2 * TELEGRAM_REQUEST_TIMEOUT_MS;
 
 export const GET = withErrorHandling(async () => {
   const session = await getSession();
@@ -158,13 +166,26 @@ export const POST = withErrorHandling(async (request: Request) => {
   // behavior predictable and per-target error attribution simple at this
   // scale (2 targets today).
   let successCount = 0;
+  let unknownCount = 0;
   const targetErrors: Record<string, string> = {};
   const targetsWithChatIds = targetKeys.map((key, i) => ({
     key,
     chatId: chatIds[i],
   }));
 
+  const startedAt = Date.now();
+
   for (const { key, chatId } of targetsWithChatIds) {
+    // A target is only started if its worst case still fits the budget.
+    // Otherwise a slow Telegram would run the function past maxDuration,
+    // the platform would kill it mid-loop, and the audit row would never
+    // be finalised. A skipped target is a definite "not sent".
+    if (Date.now() - startedAt + WORST_CASE_TARGET_MS > SEND_BUDGET_MS) {
+      targetErrors[key] =
+        "Tidak dikirim karena batas waktu pengiriman habis. Kirim ulang ke target ini saja.";
+      continue;
+    }
+
     try {
       if (sanitizedImage) {
         if (fitsAsCaption(message)) {
@@ -195,18 +216,23 @@ export const POST = withErrorHandling(async (request: Request) => {
         // Continue to the remaining targets — one failing shouldn't stop
         // delivery to the others.
         targetErrors[key] = err.translatedMessage;
+        if (err.outcomeUnknown) unknownCount++;
         continue;
       }
       throw err;
     }
   }
 
-  const status: "sent" | "failed" | "partial" =
-    successCount === chatIds.length
-      ? "sent"
-      : successCount === 0
-        ? "failed"
-        : "partial";
+  // "uncertain" outranks the rest: if even one target may have received
+  // the message, the report must not be presented as simply failed.
+  const status: "sent" | "failed" | "partial" | "uncertain" =
+    unknownCount > 0
+      ? "uncertain"
+      : successCount === chatIds.length
+        ? "sent"
+        : successCount === 0
+          ? "failed"
+          : "partial";
 
   await db
     .update(reports)
@@ -230,17 +256,24 @@ export const POST = withErrorHandling(async (request: Request) => {
     );
   }
 
-  if (status === "partial") {
+  // An uncertain result is returned as a completed submission (like a
+  // partial one), not an error: an error keeps the user on the form with
+  // the send button under their cursor, which invites the duplicate.
+  if (status === "partial" || status === "uncertain") {
     const targetLabels = Object.fromEntries(
       getPublicTargets().map((t) => [t.key, t.label])
     );
     const detailLines = Object.entries(targetErrors).map(
       ([key, msg]) => `${targetLabels[key] ?? key}: ${msg}`
     );
+    const summary =
+      status === "uncertain"
+        ? `Pengiriman tidak dapat dipastikan. Terkonfirmasi terkirim ke ${successCount} dari ${chatIds.length} target.`
+        : `Terkirim ke ${successCount} dari ${chatIds.length} target.`;
     return NextResponse.json({
       ok: true,
       partial: true,
-      message: `Terkirim ke ${successCount} dari ${chatIds.length} target.\n${detailLines.join("\n")}`,
+      message: `${summary}\n${detailLines.join("\n")}`,
     });
   }
 

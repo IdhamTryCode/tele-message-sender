@@ -60,7 +60,9 @@ export const reports = pgTable("reports", {
   // Username from the session, not from client-supplied body — set by the
   // route handler, never trusted from request input.
   submittedBy: varchar("submitted_by", { length: 50 }).notNull(),
-  status: varchar("status", { length: 20 }).notNull(), // "sent" | "failed" | "partial"
+  // "pending" (written before sending, never finalised) | "sent" | "failed"
+  // | "partial" | "uncertain" (a target gave no answer; it may have arrived)
+  status: varchar("status", { length: 20 }).notNull(),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
