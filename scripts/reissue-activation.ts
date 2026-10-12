@@ -2,6 +2,8 @@
  * Regenerates an activation code for an existing, not-yet-confirmed user —
  * for when their original code expired/was lost, or (as with users seeded
  * before the activation-code feature existed) they never had one at all.
+ * Also clears any stored TOTP secret, so a secret already issued from the old
+ * code stops working the moment the code is reissued.
  * Refuses for already-confirmed accounts, since those don't need
  * reissuing — see scripts/seed-user.ts for the initial-registration path.
  *
@@ -54,7 +56,7 @@ async function main() {
 
   await db
     .update(schema.users)
-    .set({ activationCode, activationCodeExpiresAt })
+    .set({ activationCode, activationCodeExpiresAt, totpSecretEncrypted: null })
     .where(eq(schema.users.username, username));
 
   console.log(`\nNew activation code issued for "${username}".`);

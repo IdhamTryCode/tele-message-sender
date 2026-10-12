@@ -22,11 +22,19 @@ function maxAllowedDate(): string {
  * matters; client-side validation can always be bypassed.
  */
 export const reportSchema = z.object({
+  // The title lands on the first line of a plain-text Telegram message,
+  // above "Tanggal:" and "Dikirim oleh:", so a title carrying a line break
+  // (e.g. via the API, which the single-line browser input doesn't stop)
+  // would forge extra header lines above the real sender. Reject any control
+  // character (Cc covers \n, \r, \t) or line/paragraph separator.
   judul: z
     .string()
     .trim()
     .min(3, "Judul minimal 3 karakter")
-    .max(200, "Judul maksimal 200 karakter"),
+    .max(200, "Judul maksimal 200 karakter")
+    .refine((val) => !/[\p{Cc}\u2028\u2029]/u.test(val), {
+      message: "Judul tidak boleh mengandung karakter baris baru",
+    }),
   tanggal: z
     .string()
     .regex(/^\d{4}-\d{2}-\d{2}$/, "Format tanggal harus YYYY-MM-DD")
@@ -52,9 +60,17 @@ export const reportSchema = z.object({
     .trim()
     .min(10, "Mitigasi minimal 10 karakter")
     .max(1850, "Mitigasi maksimal 1850 karakter"),
+  // The route resolves every key against a server-side whitelist and sends
+  // one Telegram message per key in a loop, so duplicates or an oversized
+  // array would let a single request flood one group and sidestep the
+  // per-user rate limit. Duplicates are rejected outright, not deduped.
   targetKeys: z
-    .array(z.string())
-    .min(1, "Pilih minimal satu target"),
+    .array(z.string().max(50, "Nama target maksimal 50 karakter"))
+    .min(1, "Pilih minimal satu target")
+    .max(20, "Maksimal 20 target")
+    .refine((keys) => new Set(keys).size === keys.length, {
+      message: "Target tidak boleh duplikat",
+    }),
 });
 
 export type ReportInput = z.infer<typeof reportSchema>;
